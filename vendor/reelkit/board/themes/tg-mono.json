@@ -1,0 +1,80 @@
+{
+  "name": "tg-mono",
+  "font": {
+    "family": "Instrument Serif",
+    "file": "fonts/InstrumentSerif-Regular.ttf",
+    "weight": 400,
+    "variation": "normal",
+    "tracking": "-0.015em",
+    "lineHeight": 1.0
+  },
+  "sizes": {
+    "hero": 150,
+    "title": 124,
+    "body": 90,
+    "small": 66,
+    "label": 56
+  },
+  "cutout": {
+    "normal": 150,
+    "big": 230,
+    "small": 112,
+    "huge": 360
+  },
+  "colors": {
+    "ink": "#f7f6f3",
+    "salmon": "#ff6a3d",
+    "peach": "#ffb38a",
+    "gold": "#ffd23f",
+    "lavender": "#8b5cf6",
+    "blue": "#5fb4ff",
+    "mint": "#3fbf6a",
+    "rose": "#f0527e",
+    "red": "#f0527e"
+  },
+  "heroGradient": [
+    "#f2c96b",
+    "#f4a07c"
+  ],
+  "shadow": "none",
+  "stroke": {
+    "color": "#ffd23f",
+    "width": 5,
+    "draw": 0.45
+  },
+  "scrim": {
+    "from": "rgba(0,0,0,0)",
+    "to": "rgba(0,0,0,0)",
+    "height": 860
+  },
+  "gap": 22,
+  "colGap": 150,
+  "lead": 0.1,
+  "minHold": 1.2,
+  "maxStack": 4,
+  "enter": {
+    "dur": 0.3,
+    "ease": "power2.out",
+    "blur": 16,
+    "rise": 10
+  },
+  "exit": {
+    "dur": 0.25,
+    "ease": "power1.in",
+    "blur": 10
+  },
+  "move": {
+    "dur": 0.4,
+    "ease": "power2.inOut"
+  },
+  "number": {
+    "dur": 0.9,
+    "ease": "power3.out",
+    "blur": 8
+  },
+  "type": {
+    "perChar": 0.04
+  },
+  "rowGap": 150,
+  "stackAlign": "top"
+}

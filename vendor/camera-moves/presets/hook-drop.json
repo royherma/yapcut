@@ -1,0 +1,39 @@
+{
+  "name": "hook-drop",
+  "source": "ali-hook.mp4 0-2.2s, measured by bin/measure.mjs",
+  "base": {
+    "zoom": 1,
+    "x": 0,
+    "y": 0,
+    "rot": 0
+  },
+  "moves": [
+    {
+      "at": 0.016,
+      "dur": 1.356,
+      "ease": [
+        0.51,
+        0.28,
+        0.27,
+        0.96
+      ],
+      "to": {
+        "zoom": 1.0269,
+        "x": -0.0036,
+        "y": 0.1146
+      }
+    }
+  ],
+  "fill": {
+    "mode": "shade",
+    "color": "#5f5d59",
+    "shadeHeight": 0.3,
+    "shadeStrength": 1,
+    "shadeSolid": 0.13
+  },
+  "fit": {
+    "axis": "y",
+    "rms": 0.003
+  },
+  "ref": "ali-hook.mp4"
+}

@@ -1,0 +1,29 @@
+html, body { width: 100vw !important; height: 100vh !important; overflow: hidden; background: #000; cursor: pointer; }
+#fx { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+video.cut { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
+#zoom { transform-origin: 0 0; }
+#caps { z-index: 6; }
+.cap { position: absolute; left: 60px; right: 60px; text-align: center; font-family: Georgia, serif; color: var(--t-over, var(--t-text, #fff)); opacity: 0; transform: translateY(-50%);
+  text-shadow: 0 0 3px rgba(0,0,0,.6), 3px 3px 0 rgba(0,0,0,.45); }
+.cap.title { font-size: 104px; font-weight: 700; line-height: 1.08; }
+.cap.sub { font-size: 46px; font-style: italic; }
+.cap.word { top: 1290px; font-size: 92px; line-height: 1; animation: pop .08s ease-out; }
+.cap.word.hi { font-size: 118px; color: var(--t-accent, #fff); }
+.cap.word.hi.long { font-size: 92px; }
+@keyframes pop { from { transform: translateY(-50%) scale(.88); } to { transform: translateY(-50%) scale(1); } }
+#mark, #zone { position: absolute; z-index: 9; pointer-events: none; opacity: 0; transition: opacity .15s; border-radius: 14px; }
+#mark.on, #zone.on { opacity: 1; }
+#mark { border: 10px solid #ff6b7a; box-shadow: 0 0 0 4000px rgba(0,0,0,.35); }
+#mark.warn { border-color: #ffc15a; }
+#mark span { position: absolute; left: -10px; top: -100px; background: #ff6b7a; color: #120306; font: 700 56px/1 Inter, sans-serif; padding: 16px 24px; border-radius: 12px; white-space: nowrap; }
+#mark.warn span { background: #ffc15a; }
+#mark.banner { box-shadow: none; border-width: 0; } #mark.banner span { position: static; display: block; white-space: normal; font-size: 46px; line-height: 1.15; }
+#zone { border: 6px dashed rgba(124,196,255,.9); }
+#dragbox { position: absolute; z-index: 10; pointer-events: none; display: none; border: 6px dashed rgba(124,196,255,.95); border-radius: 18px; background: rgba(124,196,255,.06); }
+#dragbox.on { display: block; }
+#dragbox span { position: absolute; left: -6px; top: -82px; background: #7cc4ff; color: #06101c; font: 700 44px/1 Inter, sans-serif; padding: 14px 20px; border-radius: 12px; white-space: nowrap; }
+body.grab { cursor: grab; } body.grabbing, body.grabbing * { cursor: grabbing !important; }
+#dragbox.sel { border-style: solid; border-color: #7cc4ff; background: rgba(124,196,255,.04); }
+#dragbox .c { position: absolute; width: 34px; height: 34px; background: #fff; border: 6px solid #7cc4ff; border-radius: 8px; }
+#dragbox .c.tl { left: -20px; top: -20px; } #dragbox .c.tr { right: -20px; top: -20px; } #dragbox .c.bl { left: -20px; bottom: -20px; } #dragbox .c.br { right: -20px; bottom: -20px; }
+body.nwse, body.nwse * { cursor: nwse-resize !important; }

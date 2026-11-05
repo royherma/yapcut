@@ -1,0 +1,42 @@
+category,number,name,seconds,file
+
+Clean,201,Clean whoosh (hook) 1,0.5,clean/201_clean_whoosh_hook_1.wav
+Clean,202,Clean whoosh (hook) 2,0.6,clean/202_clean_whoosh_hook_2.wav
+Clean,203,Clean whoosh (hook) 3,0.45,clean/203_clean_whoosh_hook_3.wav
+Clean,204,Clean whoosh (hook) 4,0.55,clean/204_clean_whoosh_hook_4.wav
+Clean,211,Clean drop (down) 1,0.6,clean/211_clean_drop_down_1.wav
+Clean,212,Clean drop (down) 2,0.55,clean/212_clean_drop_down_2.wav
+Clean,213,Clean drop (down) 3,0.65,clean/213_clean_drop_down_3.wav
+Clean,214,Clean drop (down) 4,0.5,clean/214_clean_drop_down_4.wav
+Clean,221,Clean rise (up) 1,0.55,clean/221_clean_rise_up_1.wav
+Clean,222,Clean rise (up) 2,0.6,clean/222_clean_rise_up_2.wav
+Clean,223,Clean rise (up) 3,0.5,clean/223_clean_rise_up_3.wav
+Clean,224,Clean rise (up) 4,0.55,clean/224_clean_rise_up_4.wav
+Clean,231,Clean tick 1,0.08,clean/231_clean_tick_1.wav
+Clean,232,Clean tick 2,0.08,clean/232_clean_tick_2.wav
+Clean,233,Clean tick (wood) 3,0.1,clean/233_clean_tick_wood_3.wav
+Clean,234,Clean tap 4,0.05,clean/234_clean_tap_4.wav
+Clean,241,Clean out (soft tick) 1,0.09,clean/241_clean_out_soft_tick_1.wav
+Clean,242,Clean out (low tap) 2,0.1,clean/242_clean_out_low_tap_2.wav
+Clean,243,Clean out (fade whoosh) 3,0.3,clean/243_clean_out_fade_whoosh_3.wav
+Clean,244,Clean out (soft tick) 4,0.08,clean/244_clean_out_soft_tick_4.wav
+Clean,251,Clean thump 1,0.3,clean/251_clean_thump_1.wav
+Clean,252,Clean thump 2,0.25,clean/252_clean_thump_2.wav
+Clean,253,Clean punch whoosh 3,0.35,clean/253_clean_punch_whoosh_3.wav
+Clean,321,marimba_step_1_c5,0.5,clean/321_clean_marimba_step_1_c5.wav
+Clean,322,marimba_step_2_d5,0.5,clean/322_clean_marimba_step_2_d5.wav
+Clean,323,marimba_step_3_e5,0.5,clean/323_clean_marimba_step_3_e5.wav
+Clean,324,marimba_step_4_g5,0.5,clean/324_clean_marimba_step_4_g5.wav
+Clean,325,marimba_step_5_a5,0.5,clean/325_clean_marimba_step_5_a5.wav
+Clean,326,marimba_step_6_c6,0.5,clean/326_clean_marimba_step_6_c6.wav
+Clean,327,marimba_step_7_d6,0.5,clean/327_clean_marimba_step_7_d6.wav
+Clean,328,marimba_step_8_e6,0.5,clean/328_clean_marimba_step_8_e6.wav
+Clean,331,glass_step_1_c5,0.7,clean/331_clean_glass_step_1_c5.wav
+Clean,332,glass_step_2_d5,0.7,clean/332_clean_glass_step_2_d5.wav
+Clean,333,glass_step_3_e5,0.7,clean/333_clean_glass_step_3_e5.wav
+Clean,334,glass_step_4_g5,0.7,clean/334_clean_glass_step_4_g5.wav
+Clean,335,glass_step_5_a5,0.7,clean/335_clean_glass_step_5_a5.wav
+Clean,336,glass_step_6_c6,0.7,clean/336_clean_glass_step_6_c6.wav
+Clean,337,glass_step_7_d6,0.7,clean/337_clean_glass_step_7_d6.wav
+Clean,338,glass_step_8_e6,0.7,clean/338_clean_glass_step_8_e6.wav
+Clean,339,glass_resolve_cmaj,1.8,clean/339_clean_glass_resolve_cmaj.wav

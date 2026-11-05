@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>TG Pill</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <!--CL_DATA-->
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; margin: 0; overflow: hidden; background: transparent; }
+      #tg-pill { position: relative; width: 1080px; height: 1920px; overflow: hidden; }
+      .cl-cue { position: absolute; inset: 0; pointer-events: none; }
+      .group {
+        position: absolute; left: 0; width: 1080px; opacity: 0;
+        display: flex; flex-direction: column; align-items: center;
+        font-family: "Inter Tight", "SF Pro Display", "Helvetica Neue", Arial, sans-serif; font-weight: 800; font-size: 64px;
+        letter-spacing: -0.035em; word-spacing: 0.07em; color: var(--t-ink, #0c0c0c); white-space: nowrap;
+      }
+      .line { background: var(--t-paper, #fff); border-radius: 14px; height: 88px; line-height: 88px; padding: 0 28px; }
+      .line + .line { margin-top: -2px; }
+      .kw { color: var(--t-kw, #1f3d2b); background: var(--t-kw-bg, transparent); border-radius: 8px; }
+      .dani .group { font-size: 58px; letter-spacing: -0.01em; color: #fff; }
+      .dani .line { background: transparent; height: 70px; line-height: 70px; padding: 0 20px; -webkit-text-stroke: 9px #111; paint-order: stroke fill; text-shadow: 0 3px 10px rgba(0,0,0,.45); }
+      .dani .kw { color: #fff; }
+    </style>
+  </head>
+  <body>
+    <div id="tg-pill" data-cl-root data-composition-id="tg-pill" data-start="0" data-duration="__CL_DURATION__" data-fps="30" data-width="1080" data-height="1920">
+      <!--CL_VIDEO-->
+      <div id="stage"></div>
+    </div>
+    <script>
+      var stage = document.getElementById("stage");
+      if (CL.variant === "dani") document.getElementById("tg-pill").classList.add("dani");
+      var tl = gsap.timeline({ paused: true });
+      var W = CL.words, MAX_WORDS = 6, MAX_CHARS = 40, GAP = 0.45, LIFT = 96;
+      var emph = new Set([].concat.apply([], CL.cues.map(function (c) { return c.emph || []; })));
+      var bare = function (s) { return s.toLowerCase().replace(/[^a-z0-9']/g, ""); };
+
+      var phrases = [];
+      for (var i = 0; i < W.length; ) {
+        var to = i, chars = W[i].text.length;
+        while (to + 1 < W.length && to - i + 1 < MAX_WORDS && chars + 1 + W[to + 1].text.length <= MAX_CHARS && W[to + 1].start - W[to].end < GAP && !(W[to].brk || /[.,!?;:]$/.test(W[to].text))) { to++; chars += 1 + W[to].text.length; }
+        var tail = to + 1 < W.length && (to + 2 >= W.length || (W[to + 1].brk || /[.,!?;:]$/.test(W[to + 1].text))) && W[to + 1].start - W[to].end < GAP && to - i + 1 < MAX_WORDS + 1 && chars + 1 + W[to + 1].text.length <= MAX_CHARS + 4 && !(W[to].brk || /[.,!?;:]$/.test(W[to].text));
+        if (tail) to++;
+        phrases.push({ id: "p" + phrases.length, from: i, to: to, start: W[i].start, end: W[to].end });
+        i = to + 1;
+      }
+      phrases.forEach(function (p) { p.show = Math.max(0, p.start - 0.05); });
+      phrases.forEach(function (p, k) {
+        var next = phrases[k + 1];
+        p.hide = next ? Math.max(p.show + 0.12, Math.min(next.show - 0.02, p.end + 0.6)) : Math.min(CL.duration, p.end + 0.6);
+        var best = -1;
+        for (var j = p.from; j <= p.to; j++) if (emph.has(j) && (best < 0 || bare(W[j].text).length > bare(W[best].text).length)) best = j;
+        p.kw = best;
+      });
+
+      function split(p) {
+        var n = p.to - p.from + 1, len = function (a, b) { var s = 0; for (var q = a; q <= b; q++) s += W[q].text.length + 1; return s; };
+        if (n < 3 || len(p.from, p.to) <= 16) return [[p.from, p.to]];
+        var cut = p.from, gap = 1e9;
+        for (var c = p.from; c < p.to; c++) { var d = Math.abs(len(p.from, c) - len(c + 1, p.to)); if (d < gap) { gap = d; cut = c; } }
+        return [[p.from, cut], [cut + 1, p.to]];
+      }
+
+      phrases.forEach(function (p) {
+        var wrap = document.createElement("div");
+        wrap.className = "cl-cue";
+        wrap.setAttribute("data-cl-cue", p.id);
+        var group = document.createElement("div");
+        group.className = "group";
+        var lines = split(p);
+        group.style.top = CL.anchorY * CL.height - LIFT - (lines.length * 88 - (lines.length - 1) * 2) / 2 + "px";
+        lines.forEach(function (r) {
+          var line = document.createElement("div");
+          line.className = "line";
+          for (var q = r[0]; q <= r[1]; q++) {
+            var s = document.createElement("span");
+            s.textContent = W[q].text + (q < r[1] ? " " : "");
+            if (q === p.kw) s.className = "kw";
+            line.appendChild(s);
+          }
+          group.appendChild(line);
+        });
+        wrap.appendChild(group);
+        stage.appendChild(wrap);
+        var out = 0.08;
+        tl.fromTo(group, { opacity: 0, scale: 0.93 }, { opacity: 1, scale: 1, duration: 0.14, ease: "back.out(2.2)", immediateRender: false }, p.show);
+        tl.fromTo(group, { opacity: 1 }, { opacity: 0, duration: out, ease: "power1.in", immediateRender: false }, Math.max(p.show + 0.15, p.hide - out));
+      });
+      tl.set({}, {}, CL.duration);
+
+      window.__timelines = window.__timelines || {};
+      window.__timelines["tg-pill"] = tl;
+    </script>
+  </body>
+</html>

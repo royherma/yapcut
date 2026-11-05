@@ -1,0 +1,12 @@
+node_modules/
+.venv/
+runs/
+inbox/
+exports/
+.cache/
+bin/faces
+bin/matte
+bin/ocrbox
+lib/config.local.mjs
+*.log
+.DS_Store

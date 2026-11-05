@@ -1,0 +1,93 @@
+{
+ "name": "pastel-serif",
+ "font": {
+  "family": "Fraunces",
+  "file": "fonts/Fraunces-VF.woff2",
+  "weight": 760,
+  "variation": "'SOFT' 100, 'WONK' 0, 'opsz' 24",
+  "tracking": "0.012em",
+  "lineHeight": 1.26
+ },
+ "sizes": {
+  "hero": 116,
+  "title": 96,
+  "body": 72,
+  "small": 56,
+  "label": 50
+ },
+ "cutout": {
+  "normal": 170,
+  "big": 300,
+  "small": 130,
+  "huge": 380,
+  "popScale": 1.45
+ },
+ "colors": {
+  "ink": "#ffffff",
+  "salmon": "#f4a07c",
+  "peach": "#f5b98a",
+  "gold": "#f2c96b",
+  "lavender": "#a99be8",
+  "blue": "#b7c8f5",
+  "mint": "#9ee6a8",
+  "rose": "#f6c7d4",
+  "red": "#e2445c"
+ },
+ "heroGradient": [
+  "#f2c96b",
+  "#f4a07c"
+ ],
+ "shadow": "0 4px 18px rgba(0,0,0,0.28)",
+ "stroke": {
+  "color": "#ffffff",
+  "width": 17,
+  "draw": 0.55,
+  "widthByShape": {
+   "squiggle": 7,
+   "bracket": 13,
+   "curl": 8
+  }
+ },
+ "scrim": {
+  "from": "rgba(92,92,95,0.8)",
+  "to": "rgba(92,92,95,0)",
+  "height": 840
+ },
+ "gap": 30,
+ "colGap": 210,
+ "lead": 0.1,
+ "minHold": 1.2,
+ "maxStack": 4,
+ "enter": {
+  "dur": 0.42,
+  "ease": "power3.out",
+  "blur": 12,
+  "rise": 28
+ },
+ "exit": {
+  "dur": 0.32,
+  "ease": "power2.in",
+  "blur": 12
+ },
+ "move": {
+  "dur": 0.5,
+  "ease": "power3.inOut"
+ },
+ "number": {
+  "dur": 1.1,
+  "ease": "power2.out",
+  "blur": 8
+ },
+ "type": {
+  "perChar": 0.055
+ },
+ "rowGap": 150,
+ "pillText": "#ffe7b3",
+ "labelWeight": 560,
+ "stackAlign": "center",
+ "overflow": 120,
+ "leadByKind": {
+  "cutout": 0.45,
+  "number": 0.5
+ }
+}

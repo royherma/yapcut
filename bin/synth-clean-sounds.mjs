@@ -6,7 +6,7 @@ const OUT = CFG.sfxDir + '/clean', CAT = CFG.sfxDir + '/catalog.csv';
 mkdirSync(OUT, { recursive: true });
 const tail = ',loudnorm=I=-20:TP=-2,afade=t=in:d=0.004,aformat=sample_fmts=s16:channel_layouts=stereo';
 const run = (args) => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args]);
-const whoosh = (d, c, hp, lp, pk, k, f0, f1) => ['-f', 'lavfi', '-i', `anoisesrc=d=${d}:c=${c}:r=48000:a=0.6`, '-f', 'lavfi', '-i', `aevalsrc='0.05*sin(2*PI*(${f0}*t+${(f1 - f0) / (2 * d)}*t*t))':d=${d}:s=48000`,
+const whoosh = (d, c, hp, lp, pk, k, f0, f1) => ['-f', 'lavfi', '-i', `anoisesrc=d=${d}:c=${c}:r=48000:a=0.6:seed=7`, '-f', 'lavfi', '-i', `aevalsrc='0.05*sin(2*PI*(${f0}*t+${(f1 - f0) / (2 * d)}*t*t))':d=${d}:s=48000`,
   '-filter_complex', `[0]highpass=f=${hp},lowpass=f=${lp}[n];[n][1]amix=inputs=2:normalize=0,volume=eval=frame:volume='if(lt(t,${pk}),pow(t/${pk},1.6),exp(-(t-${pk})*${k}))',afade=t=out:st=${d - 0.04}:d=0.04${tail}`];
 const tick = (d, f, dec, noise) => ['-f', 'lavfi', '-i', `aevalsrc='sin(2*PI*${f}*t)*exp(-t*${dec})+${noise}*(random(0)-0.5)*exp(-t*400)':d=${d}:s=48000`, '-af', `highpass=f=150${tail}`];
 const thump = (d, f, drop, dec) => ['-f', 'lavfi', '-i', `aevalsrc='sin(2*PI*(${f}*t-${drop}*t*t))*exp(-t*${dec})+0.15*(random(0)-0.5)*exp(-t*60)':d=${d}:s=48000`, '-af', `lowpass=f=2500${tail}`];

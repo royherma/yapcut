@@ -26,7 +26,7 @@ Drop a take on the page. A few minutes later you have:
 - **Zooms** that punch in on the words that matter
 - **Captions** timed to each spoken word, in the style you pick
 - **Sound effects** on the beats, mixed under your voice
-- **41 on-screen effects** the AI places where they show what you are saying
+- **39 on-screen effects** the AI places where they show what you are saying
 - **A grade for every version**, with what pulled it down and a button to fix it
 
 The edit runs on your machine. The thinking is done by the AI CLI you already use: **Claude Code** or **Codex** (signed in with your ChatGPT plan). Your video never leaves your Mac.
@@ -69,7 +69,7 @@ Every take becomes versions side by side: **Clean** (just the cut), **Light**, *
 
 The script is the edit. Strike a word to cut it, click it again to bring it back, click a pause to change how long the gap is. Pick the caption style, hook look and theme from the menus; drag the captions, hook title and cards on the video. Every change plays right away, no render.
 
-## 41 effects that show what you say
+## 39 effects that show what you say
 
 <img src="docs/images/effects.jpg" alt="A grid of effect stills: orbit, spotlight, checklist, vertigo, cover story, split screen and more" width="100%">
 

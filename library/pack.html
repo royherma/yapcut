@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sound Pack</title>
+<style>
+:root{color-scheme:dark;--bg:#05060a;--panel:#0e1119;--panel2:#161b28;--line:#1b2131;--line2:#2b3449;--text:#e8ecf7;--mute:#8f9ab5;--dim:#5a6580;--accent:#7cc4ff;--good:#52e6a0;--bad:#ff6b7a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.35 Inter,system-ui,-apple-system,sans-serif;min-height:100vh;overflow:auto}
+header{display:flex;align-items:baseline;gap:16px;padding:16px 24px 10px;border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:20px}
+header .sub{color:var(--mute)}
+header .count{margin-left:auto;}header label.count{margin-left:auto}header .count + .count{margin-left:16px;font:600 13px ui-monospace,monospace;color:var(--mute)}
+main{padding:8px 24px 16px;display:flex;flex-direction:column;gap:6px}
+.row{display:grid;grid-template-columns:170px 1fr;gap:14px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 12px}
+.slot b{display:block;font-size:15px}
+.slot span{display:block;color:var(--mute);font-size:12px}
+.slot em{font-style:normal;font:600 11px ui-monospace,monospace;color:var(--dim)}
+.slot .ok{color:var(--good)}
+.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:6px}
+.chip{background:var(--panel2);border:1.5px solid var(--line2);border-radius:10px;padding:5px 7px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.chip.yes{border-color:var(--good);background:rgba(82,230,160,.08)}
+.chip.no{opacity:.4}
+.chip.no .nm{text-decoration:line-through}
+.chip.playing{box-shadow:0 0 0 2px var(--accent)}
+.nm{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.meta{font:500 11px ui-monospace,monospace;color:var(--dim)}
+.btns{display:flex;gap:5px}
+button{flex:1;border:1px solid var(--line2);background:#1d2333;color:var(--text);border-radius:7px;padding:4px 0;font:600 11px Inter,system-ui,sans-serif;cursor:pointer}
+button:hover{background:#262e42}
+button.play{flex:1.3}
+.chip.yes button.y{background:var(--good);color:#06101f;border-color:var(--good)}
+.chip.no button.n{background:var(--bad);color:#06101f;border-color:var(--bad)}
+</style>
+</head>
+<body>
+<header><h1 id="ttl">Sound Pack</h1><span class="sub" id="note"></span><label class="count"><input type="checkbox" id="showno"> show rejected</label><span class="count" id="count"></span></header>
+<main id="rows"></main>
+<script>
+var P = null, cur = null, A = new Audio(), SHOWNO = false;
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function load() { fetch('/api/packs').then(function (r) { return r.json(); }).then(function (j) { P = j; draw(); }); }
+function draw() {
+  var pk = P.packs[P.active], n = 0, done = 0;
+  document.getElementById('ttl').textContent = pk.name + ' sound pack';
+  document.getElementById('note').textContent = pk.note + ' Click a name to hear it at the length it plays in videos.';
+  document.getElementById('rows').innerHTML = Object.keys(pk.slots).map(function (k) {
+    var s = pk.slots[k]; n++; if (s.approved.length) done++;
+    return '<section class="row"><div class="slot"><b>' + esc(s.label) + '</b><span>' + esc(s.use) + '</span><em>plays ' + s.len + ' s · </em><em class="' + (s.approved.length ? 'ok' : '') + '">' + s.approved.length + ' approved</em></div><div class="chips">' +
+      s.candidates.filter(function (id) { return s.rejected.indexOf(id) < 0 || SHOWNO; }).map(function (id) {
+        var i = s.info[id] || {}, st = s.approved.indexOf(id) >= 0 ? 'yes' : s.rejected.indexOf(id) >= 0 ? 'no' : '';
+        return '<div class="chip ' + st + '" data-slot="' + k + '" data-id="' + esc(id) + '"><span class="nm" title="' + esc(id) + '">' + esc(i.name || id) + '</span><span class="meta">' + esc(i.category) + ' · ' + (i.seconds != null ? i.seconds.toFixed(2) : '?') + ' s</span><div class="btns"><button class="play">Play</button><button class="y" title="Approve">Yes</button><button class="n" title="Reject">No</button></div></div>';
+      }).join('') + '</div></section>';
+  }).join('');
+  document.getElementById('count').textContent = done + ' of ' + n + ' uses have a sound';
+}
+function play(chip) {
+  var s = P.packs[P.active].slots[chip.dataset.slot];
+  document.querySelectorAll('.chip.playing').forEach(function (c) { c.classList.remove('playing'); });
+  chip.classList.add('playing');
+  clearTimeout(cur); A.pause(); A.src = '/sfx/' + encodeURIComponent(chip.dataset.id).replace(/%2F/g, '/'); A.volume = 1; A.currentTime = 0;
+  A.play().catch(function () {});
+  var t0 = Date.now(), fade = function () { var left = s.len - (Date.now() - t0) / 1000; if (left <= 0) { A.pause(); chip.classList.remove('playing'); return; } if (left < 0.08) A.volume = Math.max(0, left / 0.08); cur = setTimeout(fade, 10); };
+  fade();
+}
+function mark(chip, state) {
+  var was = chip.classList.contains(state === 'approve' ? 'yes' : 'no');
+  fetch('/api/pack', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pack: P.active, slot: chip.dataset.slot, id: chip.dataset.id, state: was ? 'clear' : state }) })
+    .then(function (r) { return r.json(); }).then(function (j) { if (j.ok) { P.packs[P.active].slots[chip.dataset.slot] = Object.assign(P.packs[P.active].slots[chip.dataset.slot], j.slot); draw(); } });
+}
+document.addEventListener('click', function (e) {
+  var chip = e.target.closest('.chip'); if (!chip) return;
+  if (e.target.closest('.y')) return mark(chip, 'approve');
+  if (e.target.closest('.n')) return mark(chip, 'reject');
+  play(chip);
+});
+document.getElementById('showno').addEventListener('change', function (e) { SHOWNO = e.target.checked; draw(); });
+load();
+</script>
+</body>
+</html>

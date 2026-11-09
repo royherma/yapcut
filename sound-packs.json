@@ -1,0 +1,414 @@
+{
+  "active": "clean",
+  "banned": [],
+  "packs": {
+    "clean": {
+      "name": "Clean",
+      "note": "Short, clean, subtle. Only approved sounds are used.",
+      "slots": {
+        "hook": {
+          "label": "Hook whoosh",
+          "use": "first frame, as the hook lands",
+          "len": 0.8,
+          "candidates": [
+            "clean/203_clean_whoosh_hook_3.wav"
+          ],
+          "approved": [
+            "clean/203_clean_whoosh_hook_3.wav"
+          ],
+          "rejected": []
+        },
+        "camdown": {
+          "label": "Camera drops",
+          "use": "camera moves down to make room up top",
+          "len": 0.6,
+          "candidates": [
+            "clean/211_clean_drop_down_1.wav",
+            "clean/212_clean_drop_down_2.wav",
+            "clean/213_clean_drop_down_3.wav",
+            "clean/214_clean_drop_down_4.wav"
+          ],
+          "approved": [
+            "clean/211_clean_drop_down_1.wav",
+            "clean/212_clean_drop_down_2.wav",
+            "clean/213_clean_drop_down_3.wav",
+            "clean/214_clean_drop_down_4.wav"
+          ],
+          "rejected": []
+        },
+        "camup": {
+          "label": "Camera returns",
+          "use": "camera moves back up",
+          "len": 0.6,
+          "candidates": [
+            "clean/221_clean_rise_up_1.wav",
+            "clean/222_clean_rise_up_2.wav",
+            "clean/223_clean_rise_up_3.wav",
+            "clean/224_clean_rise_up_4.wav"
+          ],
+          "approved": [
+            "clean/221_clean_rise_up_1.wav",
+            "clean/222_clean_rise_up_2.wav",
+            "clean/223_clean_rise_up_3.wav",
+            "clean/224_clean_rise_up_4.wav"
+          ],
+          "rejected": []
+        },
+        "itemin": {
+          "label": "Item appears",
+          "use": "picture card or checklist comes in",
+          "len": 0.4,
+          "candidates": [],
+          "approved": [],
+          "rejected": []
+        },
+        "itemout": {
+          "label": "Item leaves",
+          "use": "picture card or checklist goes away",
+          "len": 0.3,
+          "candidates": [],
+          "approved": [],
+          "rejected": []
+        },
+        "tick": {
+          "label": "Checklist tick",
+          "use": "a line ticks as it is said",
+          "len": 0.2,
+          "candidates": [
+            "clean/231_clean_tick_1.wav",
+            "clean/232_clean_tick_2.wav",
+            "clean/233_clean_tick_wood_3.wav",
+            "clean/234_clean_tap_4.wav"
+          ],
+          "approved": [],
+          "rejected": []
+        },
+        "punch": {
+          "label": "Punch zoom",
+          "use": "quick zoom-in on a key word",
+          "len": 0.5,
+          "candidates": [
+            "clean/251_clean_thump_1.wav",
+            "clean/252_clean_thump_2.wav"
+          ],
+          "approved": [
+            "clean/251_clean_thump_1.wav",
+            "clean/252_clean_thump_2.wav"
+          ],
+          "rejected": []
+        },
+        "pop": {
+          "label": "Pop",
+          "use": "small pop on an emphasis or a word landing",
+          "len": 0.6,
+          "candidates": [],
+          "approved": [],
+          "rejected": []
+        },
+        "whoosh": {
+          "label": "Whoosh",
+          "use": "transition whoosh in the middle of the video",
+          "len": 1.2,
+          "candidates": [],
+          "approved": [],
+          "rejected": []
+        }
+      }
+    },
+    "soft-ui": {
+      "name": "Soft UI",
+      "note": "Quiet taps, bubble pops and switch clicks from the free CC0 Openverse library (openverse-sfx). Only two whooshes exist there, so hook and camera sounds are the gentlest swipes and menu slides. All 9 slots filled, none borrowed from Clean.",
+      "slots": {
+        "hook": {
+          "label": "Hook whoosh",
+          "use": "first frame, as the hook lands",
+          "len": 0.8,
+          "candidates": [
+            "ov:hits/swipe-whoosh.wav",
+            "ov:hits/swosh-swoosh-whoosh-air-sound-fr.wav"
+          ],
+          "approved": [
+            "ov:hits/swipe-whoosh.wav",
+            "ov:hits/swosh-swoosh-whoosh-air-sound-fr.wav"
+          ],
+          "rejected": []
+        },
+        "camdown": {
+          "label": "Camera drops",
+          "use": "camera moves down to make room up top",
+          "len": 0.6,
+          "candidates": [
+            "ov:hits/swosh-swoosh-whoosh-air-sound-fr.wav",
+            "ov:tap/menu-fx-03-descending.wav"
+          ],
+          "approved": [
+            "ov:hits/swosh-swoosh-whoosh-air-sound-fr.wav",
+            "ov:tap/menu-fx-03-descending.wav"
+          ],
+          "rejected": []
+        },
+        "camup": {
+          "label": "Camera returns",
+          "use": "camera moves back up",
+          "len": 0.6,
+          "candidates": [
+            "ov:hits/swipe-whoosh.wav",
+            "ov:tap/menu-fx-03-normal.wav"
+          ],
+          "approved": [
+            "ov:hits/swipe-whoosh.wav",
+            "ov:tap/menu-fx-03-normal.wav"
+          ],
+          "rejected": []
+        },
+        "itemin": {
+          "label": "Item appears",
+          "use": "picture card or checklist comes in",
+          "len": 0.4,
+          "candidates": [
+            "ov:show/bubble-pop.wav",
+            "ov:show/ui-series-hollow-pop.wav",
+            "ov:show/soft-electronic-ping.wav",
+            "ov:show/super-cute-05.wav",
+            "ov:show/mouth-pop.wav",
+            "ov:show/ui-button-click.wav"
+          ],
+          "approved": [
+            "ov:show/bubble-pop.wav",
+            "ov:show/ui-series-hollow-pop.wav",
+            "ov:show/soft-electronic-ping.wav",
+            "ov:show/super-cute-05.wav",
+            "ov:show/mouth-pop.wav",
+            "ov:show/ui-button-click.wav"
+          ],
+          "rejected": []
+        },
+        "itemout": {
+          "label": "Item leaves",
+          "use": "picture card or checklist goes away",
+          "len": 0.3,
+          "candidates": [
+            "ov:hide/ui-close-menu.wav",
+            "ov:hide/ui-close.wav",
+            "ov:hide/light-switch-off.wav",
+            "ov:hide/ui-back-sound.wav",
+            "ov:hide/switch-off-24bit-wav.wav"
+          ],
+          "approved": [
+            "ov:hide/ui-close-menu.wav",
+            "ov:hide/ui-close.wav",
+            "ov:hide/light-switch-off.wav",
+            "ov:hide/ui-back-sound.wav",
+            "ov:hide/switch-off-24bit-wav.wav"
+          ],
+          "rejected": []
+        },
+        "tick": {
+          "label": "Checklist tick",
+          "use": "a line ticks as it is said",
+          "len": 0.2,
+          "candidates": [
+            "ov:tap/soft-ui-button-click.wav",
+            "ov:tap/family-friendly-inspect-sound-ui.wav",
+            "ov:tap/sfx-ui-button-click.wav",
+            "ov:tap/metal-tick-1.wav"
+          ],
+          "approved": [
+            "ov:tap/soft-ui-button-click.wav",
+            "ov:tap/family-friendly-inspect-sound-ui.wav",
+            "ov:tap/sfx-ui-button-click.wav",
+            "ov:tap/metal-tick-1.wav"
+          ],
+          "rejected": []
+        },
+        "punch": {
+          "label": "Punch zoom",
+          "use": "quick zoom-in on a key word",
+          "len": 0.5,
+          "candidates": [
+            "ov:tap/thump.wav",
+            "ov:tap/soft-snare.wav",
+            "ov:hits/impact.wav"
+          ],
+          "approved": [
+            "ov:tap/thump.wav",
+            "ov:tap/soft-snare.wav",
+            "ov:hits/impact.wav"
+          ],
+          "rejected": []
+        },
+        "pop": {
+          "label": "Pop",
+          "use": "small pop on an emphasis or a word landing",
+          "len": 0.6,
+          "candidates": [
+            "ov:show/bubble-pop.wav",
+            "ov:tap/soft-ui-button-click.wav",
+            "ov:show/mouth-pop.wav"
+          ],
+          "approved": [
+            "ov:show/bubble-pop.wav",
+            "ov:tap/soft-ui-button-click.wav",
+            "ov:show/mouth-pop.wav"
+          ],
+          "rejected": []
+        },
+        "whoosh": {
+          "label": "Whoosh",
+          "use": "transition whoosh in the middle of the video",
+          "len": 1.2,
+          "candidates": [
+            "ov:hits/swipe-whoosh.wav",
+            "ov:hits/swosh-swoosh-whoosh-air-sound-fr.wav"
+          ],
+          "approved": [
+            "ov:hits/swipe-whoosh.wav",
+            "ov:hits/swosh-swoosh-whoosh-air-sound-fr.wav"
+          ],
+          "rejected": []
+        }
+      }
+    },
+    "picks": {
+      "name": "your picks",
+      "note": "Curated sounds: media in/out, media cuts, floating. Hook, camera, tick, punch, pop and whoosh still borrow Clean - to fill later. + your 11 ElevenLabs UI sounds (10-25): clicks, alert, text move, flashback whoosh.",
+      "slots": {
+        "hook": {
+          "label": "Hook whoosh",
+          "use": "first frame, as the hook lands",
+          "len": 0.8,
+          "candidates": [
+            "clean/203_clean_whoosh_hook_3.wav"
+          ],
+          "approved": [
+            "clean/203_clean_whoosh_hook_3.wav"
+          ],
+          "rejected": [],
+          "from": null
+        },
+        "camdown": {
+          "label": "Camera drops",
+          "use": "camera moves down to make room up top",
+          "len": 0.6,
+          "candidates": [
+            "clean/211_clean_drop_down_1.wav",
+            "clean/212_clean_drop_down_2.wav",
+            "clean/213_clean_drop_down_3.wav",
+            "clean/214_clean_drop_down_4.wav"
+          ],
+          "approved": [
+            "clean/211_clean_drop_down_1.wav",
+            "clean/212_clean_drop_down_2.wav",
+            "clean/213_clean_drop_down_3.wav",
+            "clean/214_clean_drop_down_4.wav"
+          ],
+          "rejected": [],
+          "from": "clean"
+        },
+        "camup": {
+          "label": "Camera returns",
+          "use": "camera moves back up",
+          "len": 0.6,
+          "candidates": [
+            "clean/221_clean_rise_up_1.wav",
+            "clean/222_clean_rise_up_2.wav",
+            "clean/223_clean_rise_up_3.wav",
+            "clean/224_clean_rise_up_4.wav"
+          ],
+          "approved": [
+            "clean/221_clean_rise_up_1.wav",
+            "clean/222_clean_rise_up_2.wav",
+            "clean/223_clean_rise_up_3.wav",
+            "clean/224_clean_rise_up_4.wav"
+          ],
+          "rejected": [],
+          "from": "clean"
+        },
+        "itemin": {
+          "label": "Item appears",
+          "use": "picture, clip or card comes on screen",
+          "len": 1,
+          "candidates": [],
+          "approved": [],
+          "rejected": [],
+          "from": null
+        },
+        "itemout": {
+          "label": "Item leaves",
+          "use": "picture, clip or card goes away",
+          "len": 1,
+          "candidates": [],
+          "approved": [],
+          "rejected": [],
+          "from": null
+        },
+        "tick": {
+          "label": "Checklist tick",
+          "use": "a line ticks as it is said",
+          "len": 0.2,
+          "candidates": [
+            "clean/231_clean_tick_1.wav",
+            "clean/232_clean_tick_2.wav",
+            "clean/233_clean_tick_wood_3.wav",
+            "clean/234_clean_tap_4.wav"
+          ],
+          "approved": [],
+          "rejected": [],
+          "from": null
+        },
+        "punch": {
+          "label": "Punch zoom",
+          "use": "quick zoom-in on a key word",
+          "len": 0.5,
+          "candidates": [
+            "clean/251_clean_thump_1.wav",
+            "clean/252_clean_thump_2.wav"
+          ],
+          "approved": [
+            "clean/251_clean_thump_1.wav",
+            "clean/252_clean_thump_2.wav"
+          ],
+          "rejected": [],
+          "from": "clean"
+        },
+        "pop": {
+          "label": "Pop",
+          "use": "small pop on an emphasis or a word landing",
+          "len": 0.6,
+          "candidates": [],
+          "approved": [],
+          "rejected": [],
+          "from": null
+        },
+        "whoosh": {
+          "label": "Whoosh",
+          "use": "transition whoosh in the middle of the video",
+          "len": 1.2,
+          "candidates": [],
+          "approved": [],
+          "rejected": [],
+          "from": null
+        },
+        "mediacut": {
+          "label": "Media cut",
+          "use": "one picture or clip cuts straight to the next (an item leaves and the next appears within 1 s), and freeze-frame / cover / film shutter effects",
+          "len": 0.5,
+          "candidates": [],
+          "approved": [],
+          "rejected": [],
+          "from": null
+        },
+        "float": {
+          "label": "Floating",
+          "use": "floating cards and shimmers: glass card, voice orb, eyedropper (the effects that used a sparkle)",
+          "len": 1.2,
+          "candidates": [],
+          "approved": [],
+          "rejected": [],
+          "from": null
+        }
+      }
+    }
+  },
+  "hookSounds": []
+}

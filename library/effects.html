@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Yapcut Effects</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✂️</text></svg>">
+<style>
+  :root { --bg: #0e0f11; --card: #17181b; --line: #26282d; --text: #ececec; --dim: #8b8e96; --accent: #e8f86a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.35 Inter, system-ui, -apple-system, sans-serif; }
+  header { display: flex; align-items: baseline; gap: 18px; padding: 14px 20px 10px; flex-wrap: wrap; }
+  h1 { font-size: 18px; margin: 0; }
+  header code { color: var(--accent); }
+  header a { color: var(--dim); margin-left: auto; }
+  .hint { color: var(--dim); }
+  main { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 10px; padding: 0 20px 20px; }
+  .fx { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; cursor: zoom-in; }
+  .fx video, .fx .none { display: block; width: 100%; aspect-ratio: 9 / 16; max-height: 300px; object-fit: cover; background: #000; }
+  .fx .none { display: flex; align-items: center; justify-content: center; color: var(--dim); }
+  .meta { padding: 7px 9px 9px; }
+  .meta b { font-size: 13px; } .meta b i { font-style: normal; color: var(--dim); font-weight: 400; }
+  .meta p { margin: 2px 0 6px; color: var(--dim); font-size: 12px; min-height: 32px; }
+  .meta button { width: 100%; border: 1px solid var(--line); background: #1f2125; color: var(--text); border-radius: 7px; padding: 5px 6px; font: 11px/1.2 ui-monospace, monospace; cursor: copy; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta button.ok { border-color: var(--accent); color: var(--accent); }
+  .cut { color: var(--accent); font-size: 11px; }
+  #zoom { position: fixed; inset: 0; background: rgba(0,0,0,.86); display: none; align-items: center; justify-content: center; gap: 28px; cursor: zoom-out; }
+  #zoom.on { display: flex; }
+  #zoom video { height: 88vh; border-radius: 14px; }
+  #zoom div { max-width: 340px; }
+  #zoom pre { white-space: pre-wrap; color: var(--dim); font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>yapcut effects <span class="hint" id="count"></span></h1>
+  <span class="hint">Add one: <code>yapcut fx &lt;run&gt; &lt;effect&gt; &lt;word&gt;</code> then <code>yapcut render &lt;run&gt;</code>. Or let Claude pick: <code>yapcut new take.mov</code>. Click a card to zoom, the button copies the command.</span>
+  <a href="/">sound library</a>
+</header>
+<main id="grid"></main>
+<div id="zoom"><video muted loop playsinline></video><div><h2></h2><p></p><pre></pre></div></div>
+<script>
+  const grid = document.getElementById('grid'), zoom = document.getElementById('zoom');
+  fetch('/api/effects').then((r) => r.json()).then((list) => {
+    document.getElementById('count').textContent = list.length;
+    list.forEach((e, i) => {
+      const cmd = `yapcut fx <run> ${e.id} <word>`;
+      const card = document.createElement('div');
+      card.className = 'fx';
+      card.innerHTML = (e.demo ? `<video src="/demos/${e.id}.mp4" poster="/demos/${e.id}.jpg" muted loop playsinline autoplay></video>` : '<div class="none">no demo yet</div>')
+        + `<div class="meta"><b>${String(i + 1).padStart(2, '0')} ${e.name} ${e.matte ? '<span class="cut">cut-out</span>' : ''}</b><p>${e.what}</p><button title="${cmd}">${e.id}</button></div>`;
+      card.querySelector('button').onclick = (ev) => {
+        ev.stopPropagation();
+        navigator.clipboard.writeText(`yapcut fx <run> ${e.id} <word>`);
+        ev.target.classList.add('ok'); ev.target.textContent = 'copied';
+        setTimeout(() => { ev.target.classList.remove('ok'); ev.target.textContent = e.id; }, 1200);
+      };
+      card.onclick = () => {
+        if (!e.demo) return;
+        zoom.querySelector('video').src = `/demos/${e.id}.mp4`;
+        zoom.querySelector('video').play();
+        zoom.querySelector('h2').textContent = e.name;
+        zoom.querySelector('p').textContent = e.what;
+        zoom.querySelector('pre').textContent = Object.keys(e.params).length
+          ? 'params:\n' + Object.entries(e.params).map(([k, v]) => `  ${k}: ${v}`).join('\n') + `\n\nyapcut fx <run> ${e.id} <word> --set '{"${Object.keys(e.params)[0]}": ...}'`
+          : `yapcut fx <run> ${e.id} <word>`;
+        zoom.classList.add('on');
+      };
+      grid.appendChild(card);
+    });
+  });
+  zoom.onclick = () => { zoom.classList.remove('on'); zoom.querySelector('video').pause(); };
+</script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>TG Mark</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@500;700&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <!--CL_DATA-->
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; margin: 0; overflow: hidden; background: transparent; }
+      #tg-mark { position: relative; width: 1080px; height: 1920px; overflow: hidden; }
+      .cl-cue { position: absolute; inset: 0; pointer-events: none; }
+      .group {
+        position: absolute; left: 70px; width: 940px; opacity: 0;
+        display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; column-gap: 0.1em; row-gap: 0.14em;
+        font-family: "Instrument Serif", Georgia, serif; font-size: 92px; line-height: 1.1; color: #fbf7ef;
+        text-shadow: 0 2px 22px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.35);
+        transform: translateY(-50%);
+      }
+      .w { display: inline-block; position: relative; z-index: 0; padding: 0 0.1em; }
+      .fx { position: absolute; z-index: -1; pointer-events: none; opacity: 0; }
+      svg.fx { overflow: visible; z-index: 1; }
+      svg.fx path { fill: none; stroke: #f3c98b; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; stroke-dasharray: 1; stroke-dashoffset: 1; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35)); }
+
+      .marker .fx { left: -0.08em; right: -0.08em; top: 0.3em; height: 0.74em; background: linear-gradient(100deg, rgba(243, 211, 107, 0.82), #f3d36b 25%, #f0cd5c 75%, rgba(243, 211, 107, 0.86)); clip-path: polygon(5% 12%, 100% 0, 95% 88%, 0 100%); transform: rotate(-2.5deg) scaleX(0); transform-origin: 0 50%; }
+      .marker .w.on { color: #1d1a16; text-shadow: none; }
+
+      .box .fx { left: 0; right: 0; top: 0.2em; bottom: 0.06em; background: #f3c98b; border-radius: 0.14em; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3); }
+      .box .w.on { color: #1d1a16; text-shadow: none; }
+
+      .underline .fx { left: 0.1em; right: 0.1em; bottom: -0.1em; height: 9px; border-radius: 5px; background: #f3c98b; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); transform: scaleX(0); transform-origin: 0 50%; }
+
+      .sweep .fx { left: 0.1em; right: 0.1em; bottom: -0.1em; height: 7px; border-radius: 4px; background: #fbf7ef; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35); transform: scaleX(0); transform-origin: 0 50%; }
+
+      .circle svg.fx { left: -6%; width: 112%; top: 0.08em; height: 1.04em; }
+      .circle path { stroke-width: 6px; }
+    </style>
+  </head>
+  <body>
+    <div id="tg-mark" data-cl-root data-composition-id="tg-mark" data-start="0" data-duration="__CL_DURATION__" data-fps="30" data-width="1080" data-height="1920">
+      <!--CL_VIDEO-->
+      <div id="stage"></div>
+    </div>
+    <script>
+      var VARIANT = CL.variant || "marker";
+      var stage = document.getElementById("stage");
+      var tl = gsap.timeline({ paused: true });
+      var SVG = "http://www.w3.org/2000/svg";
+      var STROKE = {
+        circle: { box: "0 0 100 100", d: "M 54 5 C 85 4, 99 22, 97 50 C 95 80, 72 96, 46 95 C 17 94, 2 74, 3 48 C 4 22, 26 6, 62 9" },
+      };
+
+      function mark() {
+        if (!STROKE[VARIANT]) { var el = document.createElement("span"); el.className = "fx"; return el; }
+        var svg = document.createElementNS(SVG, "svg");
+        svg.setAttribute("class", "fx");
+        svg.setAttribute("viewBox", STROKE[VARIANT].box);
+        svg.setAttribute("preserveAspectRatio", "none");
+        var p = document.createElementNS(SVG, "path");
+        p.setAttribute("d", STROKE[VARIANT].d);
+        p.setAttribute("pathLength", "1");
+        svg.appendChild(p);
+        return svg;
+      }
+
+      CL.cues.forEach(function (cue) {
+        var wrap = document.createElement("div");
+        wrap.className = "cl-cue";
+        wrap.setAttribute("data-cl-cue", cue.id);
+        var group = document.createElement("div");
+        group.className = "group " + VARIANT;
+        group.style.top = CL.anchorY * CL.height + "px";
+        var els = [];
+        for (var i = cue.from; i <= cue.to; i++) {
+          var el = document.createElement("span");
+          el.className = "w";
+          el.textContent = CL.words[i].text;
+          var fx = mark();
+          el.appendChild(fx);
+          group.appendChild(el);
+          els.push({ el: el, fx: fx, w: CL.words[i] });
+        }
+        wrap.appendChild(group);
+        stage.appendChild(wrap);
+
+        var fadeOut = Math.max(cue.show + 0.06, cue.hide - 0.16);
+        tl.fromTo(group, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.16, ease: "power2.out", immediateRender: false }, cue.show);
+        tl.to(group, { opacity: 0, duration: 0.16, ease: "power1.in" }, fadeOut);
+        els.forEach(function (o, k) {
+          var on = Math.max(cue.show, o.w.start - 0.02);
+          var next = els[k + 1], off = next ? Math.max(on + 0.08, next.w.start - 0.02) : fadeOut;
+          var said = Math.max(0.1, Math.min(off, o.w.end) - on);
+          tl.set(o.el, { attr: { class: "w on" } }, on);
+          tl.set(o.el, { attr: { class: "w" } }, off);
+          tl.set(o.fx, { opacity: 1 }, on);
+          tl.set(o.fx, { opacity: 0 }, off);
+          if (VARIANT === "underline") tl.fromTo(o.fx, { scaleX: 0 }, { scaleX: 1, duration: Math.min(0.14, said), ease: "power2.out", immediateRender: false }, on);
+          if (VARIANT === "marker") tl.fromTo(o.fx, { scaleX: 0 }, { scaleX: 1, duration: Math.min(0.16, said), ease: "power2.out", immediateRender: false }, on);
+          if (VARIANT === "box") tl.fromTo(o.fx, { scale: 0.86 }, { scale: 1, duration: 0.14, ease: "back.out(2.4)", immediateRender: false }, on);
+          if (VARIANT === "sweep") tl.fromTo(o.fx, { scaleX: 0 }, { scaleX: 1, duration: said, ease: "none", immediateRender: false }, on);
+          if (STROKE[VARIANT]) tl.fromTo(o.fx.querySelector("path"), { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: Math.min(VARIANT === "circle" ? 0.24 : 0.16, said), ease: "power2.out", immediateRender: false }, on);
+        });
+      });
+      tl.set({}, {}, CL.duration);
+
+      window.__timelines = window.__timelines || {};
+      window.__timelines["tg-mark"] = tl;
+    </script>
+  </body>
+</html>

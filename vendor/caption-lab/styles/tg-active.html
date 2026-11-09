@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>TG Active</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@500;700&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <!--CL_DATA-->
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; margin: 0; overflow: hidden; background: transparent; }
+      #tg-active { position: relative; width: 1080px; height: 1920px; overflow: hidden; }
+      .cl-cue { position: absolute; inset: 0; pointer-events: none; }
+      .group {
+        position: absolute; left: 70px; width: 940px; opacity: 0;
+        display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; column-gap: 0.24em; row-gap: 0.06em;
+        transform: translateY(-50%);
+      }
+      .w { display: inline-block; position: relative; z-index: 1; transform-origin: 50% 70%; }
+
+      .serif { font-family: "Instrument Serif", Georgia, serif; font-size: 96px; line-height: 1.06; color: #fbf7ef; text-shadow: 0 2px 22px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.35); }
+      .serif .w.on { color: #f3c98b; }
+      .pop, .italic, .bounce, .now { column-gap: 0.34em; }
+      .italic .w.on { font-style: italic; }
+      .now .box { display: flex; column-gap: 0.28em; padding: 2px 30px 12px; border-radius: 16px; background: #fff; color: #111; text-shadow: none; font-size: 84px; }
+      .now .w.on { color: #d92c1c; }
+
+      .bold { font-family: "Instrument Sans", system-ui, sans-serif; font-weight: 700; font-size: 66px; line-height: 1.14; letter-spacing: -0.01em; text-transform: uppercase; color: #fff; -webkit-text-stroke: 12px #000; paint-order: stroke fill; text-shadow: 0 6px 18px rgba(0, 0, 0, 0.45); }
+      .color .w.on { color: #ffd84d; }
+      .bounce .w.on { color: #6ef08b; }
+
+      .pill { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 0; border-radius: 0.2em; background: #ffd84d; opacity: 0; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
+      .glide .w { padding: 0 0.12em; margin: 0 -0.12em; }
+      .glide .w.on { color: #111; -webkit-text-stroke: 0; text-shadow: none; }
+
+      .fill .w { color: rgba(255, 255, 255, 0.42); }
+      .fill .w .ink { position: absolute; inset: 0; color: #ffd84d; clip-path: inset(-20% 100% -20% 0); }
+    </style>
+  </head>
+  <body>
+    <div id="tg-active" data-cl-root data-composition-id="tg-active" data-start="0" data-duration="__CL_DURATION__" data-fps="30" data-width="1080" data-height="1920">
+      <!--CL_VIDEO-->
+      <div id="stage"></div>
+    </div>
+    <script>
+      var VARIANT = CL.variant || "pop";
+      var FONT = { pop: "serif", jump: "serif", italic: "serif italic", spotlight: "serif", color: "bold", bounce: "bold", glide: "bold", fill: "bold", reveal: "bold", now: "serif" }[VARIANT] || "serif";
+      var SPEED = CL.speed || 1;
+      var d = function (s) { return s / SPEED; };
+      var stage = document.getElementById("stage");
+      var tl = gsap.timeline({ paused: true });
+      if (VARIANT === "now") CL.cues = CL.cues.flatMap(function (cue) {
+        var out = [], i = cue.from;
+        while (i <= cue.to) {
+          var a = CL.words[i], b = CL.words[i + 1], pair = i < cue.to && b.start - a.start <= 0.28 && (a.text + b.text).length <= 16;
+          var to = pair ? i + 1 : i, next = CL.words[to + 1];
+          out.push({ id: cue.id + "-" + i, from: i, to: to, emph: cue.emph, show: CL.words[i].start, hide: Math.min(CL.words[to].end + 0.12, next ? next.start : CL.duration) });
+          i = to + 1;
+        }
+        return out;
+      });
+
+      CL.cues.forEach(function (cue) {
+        var wrap = document.createElement("div");
+        wrap.className = "cl-cue";
+        wrap.setAttribute("data-cl-cue", cue.id);
+        var group = document.createElement("div");
+        group.className = "group " + FONT + " " + VARIANT + (cue.to > cue.from ? " multi" : "");
+        group.style.top = CL.anchorY * CL.height + "px";
+        var pill = null;
+        if (VARIANT === "glide") { pill = document.createElement("span"); pill.className = "pill"; group.appendChild(pill); }
+        var box = null;
+        if (VARIANT === "now") { box = document.createElement("div"); box.className = "box"; group.appendChild(box); }
+        var els = [];
+        for (var i = cue.from; i <= cue.to; i++) {
+          var el = document.createElement("span");
+          el.className = "w" + (VARIANT === "now" && (cue.emph || []).indexOf(i) >= 0 ? " kw" : "");
+          el.textContent = CL.words[i].text;
+          if (VARIANT === "fill") { var ink = document.createElement("span"); ink.className = "ink"; ink.textContent = CL.words[i].text; el.appendChild(ink); }
+          (box || group).appendChild(el);
+          els.push({ el: el, w: CL.words[i] });
+        }
+        wrap.appendChild(group);
+        stage.appendChild(wrap);
+
+        var fadeOut = Math.max(cue.show + 0.06, cue.hide - 0.14);
+        if (VARIANT === "now") { tl.set(group, { opacity: 0 }, 0); tl.set(group, { opacity: 1 }, cue.show); tl.set(group, { opacity: 0 }, cue.hide); }
+        else {
+          tl.fromTo(group, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.14, ease: "power2.out", immediateRender: false }, cue.show);
+          tl.to(group, { opacity: 0, duration: 0.14, ease: "power1.in" }, fadeOut);
+        }
+        if (VARIANT === "spotlight") tl.set(els.map(function (o) { return o.el; }), { opacity: 0.32 }, cue.show);
+        if (VARIANT === "reveal") tl.set(els.map(function (o) { return o.el; }), { opacity: 0 }, cue.show);
+
+        els.forEach(function (o, k) {
+          var on = Math.max(cue.show, o.w.start - 0.02);
+          var next = els[k + 1], off = next ? Math.max(on + 0.06, next.w.start - 0.02) : fadeOut;
+          var said = Math.max(0.08, Math.min(off, o.w.end) - on);
+          {
+            tl.set(o.el, { attr: { class: "w on" } }, on);
+            tl.set(o.el, { attr: { class: "w" } }, off);
+          }
+          if (VARIANT === "pop" || VARIANT === "italic") {
+            tl.fromTo(o.el, { scale: 1 }, { scale: 1.1, duration: d(0.12), ease: "back.out(2.2)", immediateRender: false }, on);
+            tl.to(o.el, { scale: 1, duration: d(0.16), ease: "power2.out" }, off);
+          }
+          if (VARIANT === "jump") {
+            tl.fromTo(o.el, { y: 0 }, { y: -22, duration: d(0.11), ease: "power2.out", immediateRender: false }, on);
+            tl.to(o.el, { y: 0, duration: d(0.22), ease: "bounce.out" }, on + d(0.11));
+          }
+          if (VARIANT === "bounce") {
+            tl.fromTo(o.el, { scale: 1 }, { scale: 1.16, duration: d(0.1), ease: "power2.out", immediateRender: false }, on);
+            tl.to(o.el, { scale: 1.06, duration: d(0.3), ease: "elastic.out(1.2, 0.4)" }, on + d(0.1));
+            tl.to(o.el, { scale: 1, duration: d(0.12) }, off);
+          }
+          if (VARIANT === "spotlight") {
+            tl.to(o.el, { opacity: 1, duration: d(0.08) }, on);
+            tl.to(o.el, { opacity: 0.62, duration: d(0.2) }, off);
+          }
+          if (VARIANT === "reveal") tl.fromTo(o.el, { opacity: 0, scale: 0.55, y: 14 }, { opacity: 1, scale: 1, y: 0, duration: d(0.18), ease: "back.out(2.6)", immediateRender: false }, on);
+          if (VARIANT === "fill") tl.fromTo(o.el.querySelector(".ink"), { clipPath: "inset(-20% 100% -20% 0%)" }, { clipPath: "inset(-20% 0% -20% 0%)", duration: said, ease: "none", immediateRender: false }, on);
+          if (pill) {
+            var at = { x: function () { return o.el.offsetLeft; }, y: function () { return o.el.offsetTop + o.el.offsetHeight * 0.08; }, width: function () { return o.el.offsetWidth; }, height: function () { return o.el.offsetHeight * 0.9; } };
+            if (k === 0) tl.set(pill, Object.assign({ opacity: 1 }, at), on);
+            else tl.to(pill, Object.assign({ duration: d(0.14), ease: "power3.inOut" }, at), on);
+          }
+        });
+      });
+      tl.set({}, {}, CL.duration);
+      if (document.fonts) document.fonts.ready.then(function () { tl.invalidate(); tl.seek(tl.time(), false); });
+
+      window.__timelines = window.__timelines || {};
+      window.__timelines["tg-active"] = tl;
+    </script>
+  </body>
+</html>

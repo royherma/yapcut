@@ -1,0 +1,19 @@
+{
+  "name": "yapcut",
+  "version": "1.0.0",
+  "description": "Talking-head take in, edited vertical Reel out. Runs on your Mac with Claude Code or Codex.",
+  "scripts": {
+    "setup": "scripts/install.sh",
+    "doctor": "node bin/yapcut.mjs doctor",
+    "preview": "node bin/yapcut.mjs preview"
+  },
+  "author": "Techguyver Labs LLC",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "playwright-core": "^1.56.1"
+  },
+  "bin": {
+    "yapcut": "bin/yapcut.mjs"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "drop-blur",
+  "source": "hook-drop with a blurred copy of the take filling the gap",
+  "base": {
+    "zoom": 1,
+    "x": 0,
+    "y": 0,
+    "rot": 0
+  },
+  "moves": [
+    {
+      "at": 0.02,
+      "dur": 1.36,
+      "ease": "ali-fit",
+      "to": {
+        "zoom": 1.027,
+        "x": 0,
+        "y": 0.115
+      }
+    }
+  ],
+  "fill": {
+    "mode": "blur",
+    "color": "#5f5d59",
+    "shadeHeight": 0.2,
+    "shadeStrength": 0.5,
+    "shadeSolid": 0
+  }
+}

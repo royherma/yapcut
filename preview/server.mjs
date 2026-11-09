@@ -37,7 +37,7 @@ import { EFFECTS } from '../effects/catalog.mjs';
 import { MOVE_KINDS } from '../lib/cammove.mjs';
 import { boardFor, BOARD_DIR, CAMS, CAM_TITLE_Y, camTitle, needsCam, hookDrop, setHookDrop } from '../lib/board.mjs';
 import { ask as jevAsk, issuesOf as jevIssues, faceOf as jevFace, flagged as jevFlagged, KINDS as JEV_KINDS, USD_PER_TOKEN } from '../lib/jev.mjs';
-import { CFG, chromeLaunch } from '../lib/config.mjs';
+import { CFG, chromeLaunch, secret, secretSource, saveSecret, prefs, savePref } from '../lib/config.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const RUNS = join(ROOT, 'runs');
@@ -659,6 +659,13 @@ const sessionOf = (id) => {
   if (hit) sessions.set(id, hit);
   return hit;
 };
+const KEY_SLOTS = { typesafe: 'TYPESAFE_API_KEY', serp: 'SERP_API_KEY' };
+const keyView = (slot) => { const k = secret(KEY_SLOTS[slot]); return { set: !!k, source: secretSource(KEY_SLOTS[slot]), hint: k.length >= 12 ? k.slice(-4) : '' }; };
+function frameCheckView() {
+  const pick = prefs().checker, jev = keyView('typesafe'), cli = (() => { try { return provider(); } catch { return null; } })();
+  return { checker: pick === 'ai' || pick === 'jev' ? pick : null, effective: pick === 'ai' || pick === 'jev' ? pick : jev.set ? 'jev' : null, jev, serp: keyView('serp'), ai: { cli } };
+}
+const cleanKey = (v) => { const k = String(v ?? '').trim(); return /^[\w.\-]{8,300}$/.test(k) ? k : ''; };
 const json = (res, o) => { res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(o)); };
 const body = (req) => new Promise((ok) => { let s = ''; req.on('data', (c) => (s += c)); req.on('end', () => { try { ok(JSON.parse(s || '{}')); } catch { ok({}); } }); });
 const mt = (f) => (existsSync(f) ? statSync(f).mtimeMs : 0);
@@ -800,7 +807,21 @@ createServer(async (req, res) => {
     if (req.method === 'POST' && (m = path.match(/^\/api\/reveal\/([\w-]+)\/([\w.-]+)$/))) { const f = join(RUNS, m[1], 'exports', m[2]); if (!existsSync(f)) return json(res, { ok: false }); spawn('open', ['-R', f]); return json(res, { ok: true }); }
     if (path === '/api/effects') return json(res, EFFECTS.filter((e) => !['media-card', 'concept-card'].includes(e.id)).map((e) => ({ id: e.id, name: e.name, what: e.what, matte: !!e.matte, group: e.group ?? null, props: e.props?.map((q) => (q.key === 'meBg' ? { ...q, options: [['', 'Your room'], ...backgrounds().map((f) => [`/bglib/${f}`, f.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ')])] } : q)) ?? null })));
     if ((m = path.match(/^\/bglib\/([\w.-]+)$/))) return sendFile(req, res, join(BGLIB, m[1]), MIME[extname(m[1]).toLowerCase()] || 'application/octet-stream');
-    if ((m = path.match(/^\/api\/jev\/([\w-]+)$/))) { if (!videoOf(m[1])) return json(res, { ok: false, error: 'no such version' }); if (req.method === 'POST') jevCheck(m[1]); return json(res, { ok: true, ...jevView(m[1]) }); }
+    if (path === '/api/frame-check') {
+      if (req.method === 'POST') {
+        if (req.headers['x-yapcut-who'] !== 'page') return json(res, { ok: false, error: 'settings are saved from the page only' });
+        const b = await body(req);
+        if (b.checker === 'ai' || b.checker === 'jev') savePref('checker', b.checker);
+        for (const [slot, field] of [['typesafe', 'typesafeKey'], ['serp', 'serpKey']]) {
+          if (b[field] == null) continue;
+          if (b[field] === '') { saveSecret(KEY_SLOTS[slot], ''); continue; }
+          const k = cleanKey(b[field]); if (!k) return json(res, { ok: false, error: 'That does not look like a key. Paste it again without spaces.' });
+          saveSecret(KEY_SLOTS[slot], k);
+        }
+      }
+      return json(res, { ok: true, ...frameCheckView() });
+    }
+    if ((m = path.match(/^\/api\/jev\/([\w-]+)$/))) { if (!videoOf(m[1])) return json(res, { ok: false, error: 'no such version' }); if (req.method === 'POST') { if (!secret('TYPESAFE_API_KEY')) return json(res, { ok: false, error: 'no key', needKey: true }); jevCheck(m[1]); } return json(res, { ok: true, ...jevView(m[1]) }); }
     if ((m = path.match(/^\/api\/jev-fix\/([\w-]+)$/))) { if (!videoOf(m[1])) return json(res, { ok: false, error: 'no such version' }); if (req.method === 'POST') jevFix(m[1], (await body(req)).ids ?? []); const F = fixJobs[m[1]]; return json(res, { ok: true, fix: F ? { ...F, secs: F.secs ?? +((Date.now() - F.t0) / 1000).toFixed(1) } : null }); }
     if ((m = path.match(/^\/jevf\/([\w-]+)\/(\d+)\.jpg$/))) return sendFile(req, res, join(runDir(m[1]), url.searchParams.get('prev') ? 'jev-prev' : 'jev', `${m[2]}.jpg`), 'image/jpeg');
     if ((m = path.match(/^\/look\/([\w-]+)\/sheet\.jpg$/))) return sendFile(req, res, join(runDir(m[1]), 'look', 'sheet.jpg'), 'image/jpeg');

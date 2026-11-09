@@ -390,6 +390,13 @@ textarea{width:100%;height:56px;resize:none;padding:7px 9px;line-height:1.35}
 .sheet{position:fixed;inset:0;z-index:60;background:rgba(2,3,6,.7);display:grid;place-items:center;backdrop-filter:blur(3px)}
 .sheet[hidden]{display:none}
 .sheet .card{width:520px;max-width:92vw;background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:18px 22px;box-shadow:0 30px 80px rgba(0,0,0,.8)}
+.fcs .card{width:560px}.fcs .sub{color:var(--mute);font-size:12.5px;margin:-4px 0 12px;line-height:1.45}
+.fco{display:block;border:1px solid var(--line2);border-radius:10px;padding:11px 13px;margin:0 0 9px;cursor:pointer;background:var(--panel2)}.fco.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.fco .t{display:flex;align-items:center;gap:8px;font:600 13.5px var(--disp)}.fco .t input{accent-color:var(--accent);margin:0}.fco .d{color:var(--mute);font-size:12px;margin:3px 0 0 24px;line-height:1.45}
+.fco .st{margin:5px 0 0 24px;font-size:11.5px;color:var(--dim)}.fco .st.ok{color:var(--good)}.fco .st.no{color:var(--warn)}
+.fkey{display:flex;gap:6px;margin:8px 0 0 24px}.fkey input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line2);border-radius:7px;color:var(--text);padding:6px 9px;font:12px ui-monospace,monospace}.fkey input:focus{outline:none;border-color:var(--accent)}
+.flk{margin:5px 0 0 24px;font-size:11.5px}.flk a{color:var(--accent)}.fcs .opt{margin:14px 0 6px;font:600 12px var(--disp);color:var(--mute);text-transform:uppercase;letter-spacing:.06em}.fcs .fmsg{min-height:16px;font-size:12px;color:var(--warn);margin-top:6px}
+body.simple #fcset{display:none!important}.fkey button[hidden]{display:none}
 .sheet h3{margin:0 0 10px;font:600 15px var(--disp)}
 .keys{display:grid;grid-template-columns:150px 1fr;gap:6px 12px;font-size:12.5px}
 kbd{font:600 11px var(--mono);background:var(--panel2);border:1px solid var(--line2);border-bottom-width:2px;border-radius:5px;padding:1px 6px;margin-right:3px}
@@ -718,7 +725,8 @@ body.simple:not(.claude-on) #fbPanel{display:none!important}
     <button class="btn pri" id="addb" title="Start a new video: pick a raw take and the 12 versions get made on their own. You can also drop a video anywhere on the page. A .txt / .md sets the script."><svg class="i s" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New video</button>
     <input type="file" id="addf" accept="video/*,.mov,.mp4,.m4v,.webm,.mkv,.txt,.md,text/plain,text/markdown" multiple hidden>
     <div class="seg viewsw" id="viewsw" role="group" aria-label="Layout"><button data-vw="simple" title="Simple: the video, script, timeline, look pickers and Export. Checks, score log and Claude notes are tucked away.">Simple</button><button data-vw="full" title="Full: every panel - checks, score over time, tune log, media, notes to Claude.">Full</button></div>
-    <button class="btn jvb" id="jevb" title="Jev looks at every frame of this version, 2 a second (about 1 cent), and shows where it looks wrong. Key J."><svg class="i s" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Jev<span class="dotc" id="jevn" hidden></span></button>
+    <button class="btn jvb" id="jevb" title="Look at this version's frames and show where it looks wrong. Pick the checker with the gear next to this button. Key J."><svg class="i s" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Frame check<span class="dotc" id="jevn" hidden></span></button>
+    <button class="btn ibtn" id="fcset" title="Frame check settings: pick which checker looks at your frames and paste a key" aria-label="Frame check settings"><svg class="i s" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg></button>
     <button class="cnt" id="cnt" title="Checks run on this version. Click to open the list."></button>
     <span class="chip" id="stat"></span>
     <button class="btn ibtn" id="railR" title="Hide or show the right rail (checks + notes to Claude)" aria-label="Toggle right rail"><svg class="i s" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
@@ -808,6 +816,18 @@ body.simple:not(.claude-on) #fbPanel{display:none!important}
 <div><kbd>J</kbd></div><div>Frame check (Jev looks at every frame)</div>
 <div><kbd>?</kbd> <kbd>Esc</kbd></div><div>This sheet / close it</div></div>
 <div style="margin-top:12px;text-align:right"><button class="btn sm" id="sheetX">Close</button></div></div></div>
+<div class="sheet fcs" id="fcs" hidden><div class="card" role="dialog" aria-label="Frame check settings"><h3>Frame check</h3>
+<div class="sub">Looks at your edit for words over your face, cut-off captions and broken frames. Pick who does the looking. Keys stay on this Mac.</div>
+<label class="fco" id="fcoAi"><div class="t"><input type="radio" name="fcc" value="ai">Your AI (Claude Code or Codex)</div><div class="d">Free on your own plan. Looks at about 10 key frames, takes around a minute.</div><div class="st" id="fcAiSt"></div></label>
+<label class="fco" id="fcoJev"><div class="t"><input type="radio" name="fcc" value="jev">Jev by TypeSafe</div><div class="d">Checks every frame, 2 a second, and boxes the problem. About 1 cent per version. Needs a key.</div><div class="st" id="fcJevSt"></div>
+<div class="fkey"><input type="password" id="fcJevKey" placeholder="Paste your TypeSafe key" autocomplete="off" spellcheck="false"><button class="btn sm" id="fcJevSave" type="button">Save key</button><button class="btn sm" id="fcJevDel" type="button" hidden>Remove</button></div>
+<div class="flk"><a href="https://docs.typesafe.ai/introduction/quickstart" target="_blank" rel="noopener">Where to get a key (TypeSafe quick start)</a></div></label>
+<div class="opt">Optional</div>
+<div class="fco" style="cursor:default"><div class="t">Photo search key (SerpAPI)</div><div class="d">Lets Yapcut find real photos for pop-up cards. Skip it and cards use what you already have.</div><div class="st" id="fcSerpSt"></div>
+<div class="fkey"><input type="password" id="fcSerpKey" placeholder="Paste your SerpAPI key" autocomplete="off" spellcheck="false"><button class="btn sm" id="fcSerpSave" type="button">Save key</button><button class="btn sm" id="fcSerpDel" type="button" hidden>Remove</button></div>
+<div class="flk"><a href="https://serpapi.com/manage-api-key" target="_blank" rel="noopener">Where to get a key (SerpAPI)</a></div></div>
+<div class="fmsg" id="fcMsg"></div>
+<div style="margin-top:8px;text-align:right"><button class="btn sm pri" id="fcX">Done</button></div></div></div>
 <div class="start" id="start" hidden>
   <button class="btn x" id="stX" title="Back to your takes (Esc)">Close</button>
   <h1>Your raw take is already a Reel</h1>
@@ -3146,6 +3166,67 @@ function markReviewed() {
   if (!n) return toast('Nothing failing to clear');
   postNote('dismiss', { rule: 'All checks reviewed', sigs: sigs, text: n + ' checks marked reviewed' }).then(function (ok) { if (ok) { toast(n + ' checks cleared - any that an edit changes come back'); renderIssues(false); renderHeader(); } });
 }
+var FC = { d: null, then: null };
+function fcLoad() { return api('/api/frame-check').then(function (j) { FC.d = j; return j; }); }
+function fcRender() {
+  var d = FC.d; if (!d) return;
+  var eff = d.effective;
+  document.querySelectorAll('input[name=fcc]').forEach(function (i) { i.checked = i.value === eff; i.closest('.fco').classList.toggle('on', i.value === eff); });
+  var a = $('fcAiSt'); a.className = 'st ' + (d.ai.cli ? 'ok' : 'no'); a.textContent = d.ai.cli ? 'Found: ' + (d.ai.cli === 'claude' ? 'Claude Code' : 'Codex') : 'Not found. Install Claude Code or Codex first.';
+  [['Jev', d.jev], ['Serp', d.serp]].forEach(function (p) {
+    var st = $('fc' + p[0] + 'St'), k = p[1];
+    st.className = 'st ' + (k.set ? 'ok' : ''); st.textContent = k.set ? 'Key saved' + (k.hint ? ', ends in ...' + k.hint : '') + (k.source === 'env' ? ' (from your environment)' : k.source === 'config' ? ' (from your private config)' : '') : 'No key yet';
+    $('fc' + p[0] + 'Del').hidden = k.source !== 'page';
+  });
+}
+function fcPost(o, msg) {
+  $('fcMsg').textContent = '';
+  return api('/api/frame-check', { method: 'POST', body: JSON.stringify(o) }).then(function (j) {
+    if (!j.ok) throw new Error(j.error || 'rejected');
+    FC.d = j; fcRender(); if (msg) toast(msg); return j;
+  }).catch(function (e) { $('fcMsg').textContent = 'Could not save: ' + e.message; throw e; });
+}
+function fcOpen(then) { FC.then = then || null; $('fcs').hidden = false; $('fcJevKey').value = ''; $('fcSerpKey').value = ''; $('fcMsg').textContent = ''; fcLoad().then(fcRender); }
+function fcClose() { $('fcs').hidden = true; FC.then = null; }
+function fcWire() {
+  $('fcset').addEventListener('click', function () { fcOpen(); });
+  $('fcX').addEventListener('click', fcClose);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('fcs').hidden) { e.stopPropagation(); fcClose(); } }, true);
+  $('fcs').addEventListener('click', function (e) { if (e.target === $('fcs')) fcClose(); });
+  document.querySelectorAll('input[name=fcc]').forEach(function (i) {
+    i.addEventListener('change', function () {
+      if (i.value === 'ai' && FC.d && !FC.d.ai.cli) { fcRender(); $('fcMsg').textContent = 'Install Claude Code or Codex to use this one.'; return; }
+      if (i.value === 'jev' && FC.d && !FC.d.jev.set) { fcRender(); $('fcMsg').textContent = 'Paste your TypeSafe key below first.'; $('fcJevKey').focus(); return; }
+      fcPost({ checker: i.value }).then(function () { var t = FC.then; if (t) { fcClose(); t(); } }).catch(function () {});
+    });
+  });
+  [['Jev', 'typesafeKey', 'jev'], ['Serp', 'serpKey', null]].forEach(function (p) {
+    $('fc' + p[0] + 'Save').addEventListener('click', function () {
+      var v = $('fc' + p[0] + 'Key').value.trim(); if (!v) { $('fc' + p[0] + 'Key').focus(); return; }
+      var o = {}; o[p[1]] = v; if (p[2] && !(FC.d && FC.d.checker)) o.checker = p[2];
+      fcPost(o, 'Key saved on this Mac').then(function () { $('fc' + p[0] + 'Key').value = ''; var t = FC.then; if (p[2] && t && FC.d.effective === 'jev') { fcClose(); t(); } }).catch(function () {});
+    });
+    $('fc' + p[0] + 'Del').addEventListener('click', function () { var o = {}; o[p[1]] = ''; fcPost(o, 'Key removed').catch(function () {}); });
+  });
+}
+function aiCheck() {
+  var r = selRun(); if (!r) return; var b = $('jevb');
+  if (b.disabled) return;
+  var old = b.innerHTML; b.disabled = true; b.textContent = 'Looking...';
+  toast('Your AI is looking at this version (about 30-60 s)');
+  api('/api/look/' + encodeURIComponent(r.run), { method: 'POST', body: '{}', wait: 300000 }).then(function (j) {
+    if (!j.ok) throw new Error(j.error || 'rejected');
+    return loadVideo(S.video).then(function () { S.cf = 'fail'; renderIssues(false); toast(j.flagged ? j.flagged + ' thing' + (j.flagged === 1 ? '' : 's') + ' to look at in Checks' : 'Nothing looks wrong in ' + j.frames + ' frames'); });
+  }).catch(function (e) { toast('Could not check: ' + e.message, true); }).then(function () { b.disabled = false; b.innerHTML = old; });
+}
+function frameCheckGo() {
+  if (!$('jv').hidden) return jevClose();
+  fcLoad().then(function (d) {
+    if (d.effective === 'jev') return d.jev.set ? jevOpen() : fcOpen(frameCheckGo);
+    if (d.effective === 'ai') return aiCheck();
+    fcOpen(frameCheckGo);
+  }).catch(function (e) { toast('Could not open the frame check: ' + e.message, true); });
+}
 function jevReset(run) { JV.run = run; JV.R = JV.prevR = JV.job = null; JV.st = {}; JV.cant = {}; JV.resolved = []; JV.queue = []; JV.tried = []; JV.lastFix = 0; JV.cells = null; }
 function jevOpen() {
   var r = selRun(); if (!r) return;
@@ -3163,7 +3244,7 @@ function jevIsland(txt, pct, kind) {
 }
 function jevStart() {
   JV.cells = null; JV.wasRun = true;
-  api('/api/jev/' + encodeURIComponent(JV.run), { method: 'POST', body: '{}' }).then(function (j) { JV.job = j.job; jevRender(); jevPoll(); }).catch(function (e) { toast('Could not start the frame check: ' + e.message, true); });
+  api('/api/jev/' + encodeURIComponent(JV.run), { method: 'POST', body: '{}' }).then(function (j) { if (j.needKey) { jevClose(); return fcOpen(frameCheckGo); } JV.job = j.job; jevRender(); jevPoll(); }).catch(function (e) { toast('Could not start the frame check: ' + e.message, true); });
 }
 function jevPoll(first) {
   clearTimeout(JV.timer);
@@ -3302,7 +3383,7 @@ function jevUndo() {
   chain.then(function () { toast('Undid ' + n + ' edit' + (n === 1 ? '' : 's') + ' · checking again'); JV.lastFix = 0; JV.resolved = []; return loadVideo(S.video); }).then(jevStart).catch(function (e) { toast('Could not undo: ' + e.message, true); });
 }
 function bindJev() {
-  $('jevb').addEventListener('click', function () { $('jv').hidden ? jevOpen() : jevClose(); });
+  fcWire(); $('jevb').addEventListener('click', frameCheckGo);
   $('jvisl').addEventListener('click', jevOpen);
   $('jvx').addEventListener('click', jevClose);
   $('jv').addEventListener('click', function (e) {
@@ -3325,7 +3406,7 @@ function bindJev() {
   document.addEventListener('keydown', function (e) {
     var tg = e.target, typing = tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA' || tg.tagName === 'SELECT' || tg.isContentEditable);
     if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
-    if ((e.key === 'j' || e.key === 'J') && S.data && $('sheet').hidden && !isSimple()) { e.preventDefault(); e.stopPropagation(); return $('jv').hidden ? jevOpen() : jevClose(); }
+    if ((e.key === 'j' || e.key === 'J') && S.data && $('sheet').hidden && !isSimple()) { e.preventDefault(); e.stopPropagation(); return frameCheckGo(); }
     if (e.key === 'Escape' && !$('jv').hidden && $('lbx').hidden) { e.preventDefault(); e.stopPropagation(); jevClose(); }
   }, true);
   setInterval(jevSync, 3000);

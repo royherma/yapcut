@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/hero.jpg" alt="Yap Studio: a talking-head take with its hook title, the version card with its grade of 88.2, the editable script, the timeline of cuts, zooms, captions and sounds, and the checks list" width="100%">
+</p>
+
 <h1 align="center">YapCut</h1>
 
 <p align="center">
@@ -64,17 +68,25 @@ Then: `Edit my take ~/Movies/take.mov`.
 
 ## One take in, a dozen edits out
 
+<img src="docs/images/compare.jpg" alt="Versions of the same take side by side: Clean, Light, Medium and Heavy, each with its grade" width="100%">
+
 Every take becomes versions side by side: **Clean** (just the cut), **Light**, **Medium** and **Heavy**, each at full length, 60 s and 30 s. Play them next to each other, star the best, or press **Improve this** and it tries small fixes and keeps only the ones that raise the grade.
 
 ## Edit it like a doc
+
+<img src="docs/images/script.jpg" alt="The script panel: cut words struck through, pause pills between words, the hook title and caption pickers above" width="100%">
 
 The script is the edit. Strike a word to cut it, click it again to bring it back, click a pause to change how long the gap is. Pick the caption style, hook look and theme from the menus; drag the captions, hook title and cards on the video. Every change plays right away, no render.
 
 ## 39 effects that show what you say
 
+<img src="docs/images/effects.jpg" alt="A grid of effect stills: orbit, spotlight, checklist, vertigo, cover story, split screen and more" width="100%">
+
 Lists tick off as you say each item. A number going up draws a chart. A reveal turns the lights down. The AI reads what each effect is for (`effects/catalog.mjs`) and places them on the words they fit; you can add, move or delete any of them on the timeline. Run `yapcut fx` for the full list.
 
 ## It grades every version
+
+<img src="docs/images/checks.jpg" alt="The checks list: each failed rule with its time, what it measured and a frame of the moment" width="100%">
 
 Each version gets a score out of 100, and every part of it says why:
 

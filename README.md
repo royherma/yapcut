@@ -130,6 +130,17 @@ YapCut is mostly glue. The hard parts were made by other people, and we are grat
 
 If we left someone out, open an issue and we will add you.
 
+## Optional keys
+
+YapCut works with no keys. Two optional add-ons use your own key, billed to you:
+
+| Add-on | What it does | Get a key |
+| --- | --- | --- |
+| Jev frame check (TypeSafe) | Checks every frame of a version, 2 a second, and points at what looks wrong. About 1 cent per version | [TypeSafe quickstart](https://docs.typesafe.ai/introduction/quickstart) |
+| Picture search (SerpAPI) | Finds images for picture cards from what you say | [SerpAPI key page](https://serpapi.com/manage-api-key) |
+
+To add one, open Yap Studio in **Full** view, click the gear next to **Frame check**, and paste the key. It is saved on your Mac in `~/.config/yapcut/keys.json` (only you can read it) and never sent back to the page. Or set `TYPESAFE_API_KEY` / `SERP_API_KEY` in your shell. No key? The frame check uses your own AI CLI instead, free on your plan.
+
 ## Settings
 
 | Env var | What |
@@ -139,7 +150,7 @@ If we left someone out, open an issue and we will add you.
 | `YAPCUT_CLAUDE_FAST_MODEL` | Claude model for naming takes (default `haiku`) |
 | `YAPCUT_FFMPEG`, `YAPCUT_FFPROBE`, `YAPCUT_CHROME` | Where those programs are |
 | `YAPCUT_SFX_DIR` | Your own sound folder |
-| `TYPESAFE_API_KEY`, `SERP_API_KEY` | Optional paid add-ons: TypeSafe frame check, Google image search for picture cards. Off unless you set them |
+| `TYPESAFE_API_KEY`, `SERP_API_KEY` | The optional keys above, if you prefer env vars to the gear |
 
 Nothing leaves your Mac except the prompts your own AI CLI sends. With one of those two keys set, frames go to TypeSafe for the frame check, or search words go to SerpAPI, billed to your key.
 

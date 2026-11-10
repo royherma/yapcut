@@ -439,8 +439,9 @@
       var vids = {}, mats = {};
       [].forEach.call(document.querySelectorAll('video[id]'), function (v) { if (v !== va && v !== vb) vids[v.id] = v; });
       [].forEach.call(document.querySelectorAll('.mw[id] > video:not([id])'), function (v) { mats[v.parentNode.id] = v; });
-      [].forEach.call(document.head.querySelectorAll('style'), function (s) { s.remove(); });
+      [].forEach.call(document.head.querySelectorAll('style:not([data-keep])'), function (s) { s.remove(); });
       [].forEach.call(doc.head.querySelectorAll('style'), function (s) { document.head.appendChild(document.importNode(s, true)); });
+      [].forEach.call(document.head.querySelectorAll('style[data-keep]'), function (s) { document.head.appendChild(s); });
       [].slice.call(document.body.childNodes).forEach(function (n) { if (n.nodeName !== 'SCRIPT' || !n.src || RERUN.test(n.src)) n.remove(); });
       [].forEach.call(doc.body.childNodes, function (n) { if (n.nodeName !== 'SCRIPT') document.body.appendChild(document.importNode(n, true)); });
       document.getElementById('va').replaceWith(va); document.getElementById('vb').replaceWith(vb);

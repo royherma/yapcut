@@ -38,6 +38,10 @@ import { MOVE_KINDS } from '../lib/cammove.mjs';
 import { boardFor, BOARD_DIR, CAMS, CAM_TITLE_Y, camTitle, needsCam, hookDrop, setHookDrop } from '../lib/board.mjs';
 import { ask as jevAsk, issuesOf as jevIssues, faceOf as jevFace, flagged as jevFlagged, KINDS as JEV_KINDS, USD_PER_TOKEN } from '../lib/jev.mjs';
 import { CFG, chromeLaunch, secret, secretSource, saveSecret, prefs, savePref } from '../lib/config.mjs';
+import { writeJson, jsonOf } from '../lib/atomic.mjs';
+
+process.on('uncaughtException', (e) => console.error('SURVIVED', e));
+process.on('unhandledRejection', (e) => console.error('SURVIVED', e));
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const RUNS = join(ROOT, 'runs');
@@ -45,9 +49,21 @@ mkdirSync(RUNS, { recursive: true });
 const PORT = +process.env.PORT || 4901;
 const FFMPEG = CFG.ffmpeg;
 const only = process.argv.slice(2).filter((a) => !a.startsWith('--'));
-const videos = () => readdirSync(RUNS).filter((d) => existsSync(join(RUNS, d, 'compare.json')) && (!only.length || only.includes(d))).sort();
-const cmp = (v) => JSON.parse(readFileSync(join(RUNS, v, 'compare.json'), 'utf8'));
-const videoOf = (r) => videos().find((v) => cmp(v).runs.includes(r));
+let vids = null, vidsAt = 0, vidsM = 0, runIdx = new Map();
+const dropIndex = () => { vids = null; runIdx = new Map(); };
+const videos = () => {
+  const m = statSync(RUNS).mtimeMs;
+  if (!vids || m !== vidsM || Date.now() - vidsAt > 500) { vids = readdirSync(RUNS).filter((d) => existsSync(join(RUNS, d, 'compare.json')) && (!only.length || only.includes(d))).sort(); vidsM = m; vidsAt = Date.now(); }
+  return vids;
+};
+const cmp = (v) => jsonOf(join(RUNS, v, 'compare.json'));
+const videoOf = (r) => {
+  const hit = runIdx.get(r);
+  if (hit && videos().includes(hit) && cmp(hit).runs.includes(r)) return hit;
+  runIdx = new Map();
+  for (const v of videos()) for (const x of cmp(v).runs) if (!runIdx.has(x)) runIdx.set(x, v);
+  return runIdx.get(r);
+};
 const runDir = (r) => join(RUNS, r);
 const baseDir = (v) => (readdirSync(join(RUNS, v)).some((f) => f.startsWith('raw.')) ? join(RUNS, v) : runDir(cmp(v).runs[0]));
 const hasTake = (v) => readdirSync(join(RUNS, v)).some((f) => f.startsWith('raw.')) || cmp(v).runs.length > 0;
@@ -123,12 +139,12 @@ const sourceLine = (s) => `${s.w}x${s.h} · ${s.fps} fps · ${s.codec} · ${s.mb
 const takeDir = (dir) => dirname(proxyOf(dir));
 const takeCache = (dir) => join(takeDir(dir), 'fx-cache');
 const face = (dir) => { const p = proxyOf(dir); return faceZone(p, takeCache(dir), secs(p)); };
-const analysis = (dir) => { const p = proxyOf(dir); return analyze(takeDir(dir), p, secs(p), face(dir), JSON.parse(readFileSync(join(dir, 'words.json'), 'utf8'))); };
+const analysis = (dir) => { const p = proxyOf(dir), f = join(dirname(p), 'analysis.json'); return existsSync(f) ? jsonOf(f) : analyze(dirname(p), p, secs(p), face(dir), JSON.parse(readFileSync(join(dir, 'words.json'), 'utf8'))); };
 const FACES_BIN = join(ROOT, 'bin/faces');
 // Apple Vision face + hand boxes every 0.25 s of the take, cached per take: [{t, face, hands}] in source seconds.
 function facesOf(dir) {
   const file = join(takeCache(dir), 'faces.json');
-  if (existsSync(file)) return JSON.parse(readFileSync(file, 'utf8'));
+  if (existsSync(file)) return jsonOf(file);
   if (!existsSync(FACES_BIN)) execFileSync('swiftc', ['-O', join(ROOT, 'bin/faces.swift'), '-o', FACES_BIN]);
   const out = execFileSync(FACES_BIN, [proxyOf(dir), '0.25'], { maxBuffer: 1 << 26 }).toString();
   mkdirSync(takeCache(dir), { recursive: true });
@@ -154,12 +170,11 @@ function facesOut(r, L) {
 }
 const geomFile = (r) => join(runDir(r), 'geom.json');
 const hist = (r) => { const f = join(runDir(r), 'grades.jsonl'); return existsSync(f) ? readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []; };
-const geomAll = (r) => (existsSync(geomFile(r)) ? JSON.parse(readFileSync(geomFile(r), 'utf8')) : {});
+const geomAll = (r) => (existsSync(geomFile(r)) ? jsonOf(geomFile(r)) : {});
 const geomOf = (r) => geomAll(r).issues ?? [];
 const jsonl = (f) => (existsSync(f) ? readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []);
 
 const clearRedo = (edits) => { for (const f of readdirSync(edits).filter((x) => /^redo-\d+\.json$/.test(x))) rmSync(join(edits, f)); };
-const pool = async (items, n, fn) => { const q = [...items]; await Promise.all(Array.from({ length: n }, async () => { while (q.length) await fn(q.shift()); })); };
 
 // Candidate plans the tune loop asks the page to scan: id -> {plan, done}. Lives only while that scan runs.
 const cands = {};
@@ -200,27 +215,11 @@ async function step(v, id, fn) {
   if (st.state === 'fail') throw new Error(st.note);
 }
 
-async function scanAll(v, tag) {
-  const { chromium } = await import('playwright-core');
-  const browser = await chromium.launch(chromeLaunch({ handleSIGTERM: false, handleSIGINT: false, handleSIGHUP: false }));
-  const c = cmp(v), out = [];
-  try {
-    await pool(c.runs, 4, async (r) => {
-      const pg = await browser.newPage({ viewport: { width: 540, height: 960 } });
-      await pg.goto(`http://127.0.0.1:${PORT}/play/${r}?scan=1`);
-      await pg.waitForFunction(() => document.title.startsWith('scanned'), null, { timeout: 120000 });
-      out.push(`${c.label[r]} ${(await pg.title()).replace('scanned ', '')}`);
-      await pg.close();
-    });
-  } finally { await browser.close(); }
-  return `${tag}: ${out.join(', ')} on screen`;
-}
-
 const takeOf = (r) => (L) => [...(existsSync(join(takeDir(runDir(r)), 'analysis.json')) ? takeIssues(analysis(runDir(r))) : []), ...handOnFace(facesOut(r, L))];
 const faceBottom = (r) => (L) => Math.max(0, ...facesOut(r, L).filter((f) => f[0] < 3.3).map((f) => f[4]));
 
 // Visual frame judge: key frames of a version on one contact sheet, looked at by the AI (lib/llm.mjs). runs/<r>/look.json.
-const lookOf = (r) => (existsSync(join(runDir(r), 'look.json')) ? JSON.parse(readFileSync(join(runDir(r), 'look.json'), 'utf8')) : null);
+const lookOf = (r) => (existsSync(join(runDir(r), 'look.json')) ? jsonOf(join(runDir(r), 'look.json')) : null);
 async function look(browser, r) {
   const D = runData(r), dir = join(runDir(r), 'look');
   mkdirSync(dir, { recursive: true });
@@ -244,15 +243,8 @@ List only problems a viewer would clearly notice: text over the speaker's face o
 Return ONLY JSON: {"issues":[{"frame":n,"t":seconds,"sev":"bad"|"warn","what":"<one plain sentence>"}]}`;
   const t0 = Date.now(), out = await askJSON(prompt, { images: [sheet] });
   const res = { at: new Date().toISOString(), frames: ts.length, times: ts, secs: +((Date.now() - t0) / 1000).toFixed(0), sheet: `/look/${r}/sheet.jpg`, issues: (out.issues ?? []).map((i) => ({ rule: 'Looks wrong', sev: i.sev === 'bad' ? 'bad' : 'warn', t: i.t ?? ts[(i.frame ?? 1) - 1] ?? null, msg: `frame judge: ${i.what}` })) };
-  writeFileSync(join(runDir(r), 'look.json'), JSON.stringify(res, null, 1));
+  writeJson(join(runDir(r), 'look.json'), res);
   return res;
-}
-async function lookAll(v, n = 6) {
-  const { chromium } = await import('playwright-core');
-  const browser = await chromium.launch(chromeLaunch({ handleSIGTERM: false, handleSIGINT: false, handleSIGHUP: false }));
-  const c = cmp(v), top = c.runs.map((r) => ({ r, g: runData(r).grade })).sort((a, b) => b.g - a.g).slice(0, n), out = [];
-  try { await pool(top.map((x) => x.r), 3, async (r) => { work(v, r, true); const L = await look(browser, r).finally(() => work(v, r, false)); out.push(`${c.label[r]} ${L.issues.length}`); say(v, `looked at ${c.label[r]}: ${L.issues.length} problems in ${L.frames} frames (${L.secs} s)`); }); } finally { await browser.close(); }
-  return `top ${top.length} by grade: ${out.join(', ')} problems seen (on your own AI plan)`;
 }
 
 // Hook title (center y, ~230 px tall + subtitle) goes below the lowest chin of the first 3.3 s, above the captions.
@@ -265,7 +257,7 @@ function placeTitle(r) {
   const ty = p.titleY ?? 360;
   if (!F.length || ty + 120 < top || ty - 120 > bottom) return null;
   p.titleY = Math.min(1040, Math.round(bottom + 135));
-  writeFileSync(f, JSON.stringify(p, null, 1));
+  writeJson(f, p);
   return p.titleY;
 }
 
@@ -356,19 +348,23 @@ function jevCheck(r) {
   rmSync(`${dir}-prev`, { recursive: true, force: true }); if (existsSync(dir)) renameSync(dir, `${dir}-prev`); mkdirSync(dir, { recursive: true });
   (async () => {
     const frames = [], calls = [], q = ts.map((t, n) => ({ t, n })), browser = await sharedBrowser();
-    let live = 0, settleQ = null, allIn; const waiters = [], slot = () => (live < 16 ? (live++, Promise.resolve()) : new Promise((ok) => waiters.push(ok))), free = () => { const w = waiters.shift(); w ? w() : live--; };
-    const captured = new Promise((ok) => (allIn = ok));
+    let live = 0, settleQ = null, allIn, capFail, failed = null; const waiters = [], slot = () => (live < 16 ? (live++, Promise.resolve()) : new Promise((ok) => waiters.push(ok))), free = () => { const w = waiters.shift(); w ? w() : live--; };
+    const captured = new Promise((ok, no) => { allIn = ok; capFail = no; }), fail = (e) => { if (!failed) { failed = e; capFail(e); } };
+    captured.catch(() => {});
+    if (!ts.length) allIn();
     const settleList = async () => { await captured; await Promise.all(calls); if (!settleQ) { settleQ = frames.filter((f) => jevFlagged(f.a)); J.settleN = settleQ.length; J.phase = `Second look 0.2 s later at ${settleQ.length} flagged frames (text may still be animating in)`; settleQ = [...settleQ]; } return settleQ; };
     await Promise.all(Array.from({ length: 6 }, async () => {
-      const pg = await browser.newPage({ viewport: { width: 360, height: 640 } });
+      const pg = await browser.newPage({ viewport: { width: 360, height: 640 } }).catch((e) => { fail(e); throw e; });
       try {
         await pg.goto(`http://127.0.0.1:${PORT}/play/${r}`);
         await pg.waitForFunction(() => document.getElementById('va')?.readyState >= 2 && window.__ySnap, null, { timeout: 60000 });
         J.phase = 'Capturing frames + asking Jev';
         while (q.length) {
+          if (failed) throw failed;
           const { t, n } = q.shift(), targets = await pg.evaluate((t) => window.__ySnap(t), t), file = join(dir, `${n}.jpg`);
           const jpg = await pg.screenshot({ type: 'jpeg', quality: 75 }); writeFileSync(file, jpg); J.captured++; J.live[n] = 1; if (J.captured === ts.length) { J.capSecs = +((Date.now() - J.t0) / 1000).toFixed(1); allIn(); }
-          calls.push(slot().then(() => jevAsk(jpg)).then((x) => { J.done++; J.live[n] = Math.max(...Object.entries(x.a).filter(([k, y]) => y.type === 'noul' && k !== 'face_ok').map(([, y]) => y.noul), 1 - (x.a.face_ok?.noul ?? 1)) >= 0.6 ? 3 : 2; J.tokens += x.tokens; if (x.cached) J.cached++; else J.ms.push(x.ms); frames.push({ n, t, a: x.a, face: jevFace(x.a), targets }); }).finally(free));
+          const call = slot().then(() => jevAsk(jpg)).then((x) => { J.done++; J.live[n] = Math.max(...Object.entries(x.a).filter(([k, y]) => y.type === 'noul' && k !== 'face_ok').map(([, y]) => y.noul), 1 - (x.a.face_ok?.noul ?? 1)) >= 0.6 ? 3 : 2; J.tokens += x.tokens; if (x.cached) J.cached++; else J.ms.push(x.ms); frames.push({ n, t, a: x.a, face: jevFace(x.a), targets }); }).finally(free);
+          call.catch(fail); calls.push(call);
         }
         const sq = await settleList();
         while (sq.length) {
@@ -377,13 +373,13 @@ function jevCheck(r) {
           const x = await jevAsk(await pg.screenshot({ type: 'jpeg', quality: 75 }));
           f.settle = x.a; J.tokens += x.tokens; J.settled = (J.settled ?? 0) + 1;
         }
-      } finally { await pg.close(); }
+      } catch (e) { fail(e); throw e; } finally { await pg.close().catch(() => {}); }
     }));
     await Promise.all(calls);
     frames.sort((a, b) => a.t - b.t);
     const prev = jevOf(r), issues = jevIssues(frames), dropped = frames.filter((f) => f.settle && !jevFlagged(f.settle) && jevFlagged(f.a)).length, secs = +((Date.now() - J.t0) / 1000).toFixed(1), cost = +(J.tokens * USD_PER_TOKEN).toFixed(4);
     const ms = [...J.ms].sort((a, b) => a - b), res = { at: new Date().toISOString(), ver: J.ver, frames: frames.length, cached: J.cached, rechecked: J.settleN ?? 0, dropped, secs, capSecs: J.capSecs, jevMs: { median: ms[ms.length >> 1], max: ms.at(-1) }, tokens: J.tokens, cost, issues, prev: prev ? { at: prev.at, ids: prev.issues.map((i) => i.id) } : null, times: frames.map((f) => [f.t, ...Object.keys(JEV_KINDS).filter((k) => k !== 'face_gone').map((k) => +Math.min(f.a[k]?.noul ?? 0, f.settle?.[k]?.noul ?? 1).toFixed(2)), +(1 - (f.a.face_ok?.noul ?? 1)).toFixed(2)]) };
-    writeFileSync(join(runDir(r), 'jev.json'), JSON.stringify(res, null, 1));
+    writeJson(join(runDir(r), 'jev.json'), res);
     Object.assign(J, { state: 'done', phase: 'Done', secs, cost });
     say(v, `JEV ${cmp(v).label[r]}: ${frames.length} frames (${J.cached} unchanged) in ${secs} s, ${issues.length} issues, $${cost} billed to TypeSafe`);
   })().catch((e) => { Object.assign(J, { state: 'fail', error: String(e.message || e).slice(0, 300) }); say(v, `JEV FAIL ${r}: ${J.error}`); });
@@ -411,8 +407,8 @@ If a problem cannot be fixed with these ops (e.g. a caption style that fades wor
 Return ONLY JSON: {"ops":[{...,"id":"<problem id>","why":"<one plain sentence>"}],"skip":[{"id":"...","why":"..."}]}`;
     const out = await askJSON(prompt, { images: list.map((x) => x.frame) });
     F.phase = `Applying ${out.ops?.length ?? 0} edit${out.ops?.length === 1 ? '' : 's'}`; F.skipped = out.skip ?? [];
-    const label = (k) => fx[k]?.name ?? 'card';
-    for (const o of out.ops ?? []) {
+    const label = (k) => fx[k]?.name ?? 'card', ops = out.ops ?? [];
+    for (const o of [...ops.filter((o) => o.op !== 'delete'), ...ops.filter((o) => o.op === 'delete').sort((a, b) => b.k - a.k)]) {
       const body = o.op === 'move' ? { what: o.what, k: o.k, dx: Math.round(o.dx || 0), dy: Math.round(o.dy || 0), label: o.what === 'fx' ? label(o.k) : o.what }
         : o.op === 'scale' ? { what: 'fx', k: o.k, set: { scale: o.scale, dx: o.dx, dy: o.dy }, label: label(o.k) }
         : o.op === 'time' ? { what: 'fxtime', k: o.k, t: o.t, dur: o.dur, mode: 'move', label: label(o.k) }
@@ -449,9 +445,10 @@ async function improve(r) {
   const v = videoOf(r), c = cmp(v), t0 = Date.now();
   if (improving[r]) return;
   improving[r] = true; work(v, r, true);
-  const { chromium } = await import('playwright-core');
-  const browser = await chromium.launch(chromeLaunch({ handleSIGTERM: false, handleSIGINT: false, handleSIGHUP: false }));
+  let browser;
   try {
+    const { chromium } = await import('playwright-core');
+    browser = await chromium.launch(chromeLaunch({ handleSIGTERM: false, handleSIGINT: false, handleSIGHUP: false }));
     say(v, `IMPROVE ${c.label[r]}: start at ${runData(r).grade}`);
     const { log, tries } = await tune(runDir(r), c.judge[r], face(runDir(r)), { scan: (q, win) => scanPlan(browser, r, q, win), take: takeOf(r), faceBottom: faceBottom(r) });
     const pg = await browser.newPage({ viewport: { width: 540, height: 960 } });
@@ -464,24 +461,7 @@ async function improve(r) {
     row('look', `Frame judge looked at ${L.frames} frames: ${L.issues.length ? L.issues.map((i) => i.msg.replace('frame judge: ', '')).join(' / ').slice(0, 160) : 'nothing wrong'}`, g1);
     say(v, `IMPROVE ${c.label[r]}: ${log[0].grade} -> ${runData(r).grade} (${tries} tries, ${log.filter((x) => x.kind === 'keep').length} kept, frame judge saw ${L.issues.length}, ${((Date.now() - t0) / 1000).toFixed(0)} s)`);
   } catch (e) { say(v, `IMPROVE ${c.label[r]} STOPPED: ${e.message}`); }
-  finally { await browser.close(); improving[r] = false; work(v, r, false); }
-}
-
-// Tune every version: each candidate fix is scanned in a real page and graded; all tries logged.
-async function tuneAll(v) {
-  const { chromium } = await import('playwright-core');
-  const browser = await chromium.launch(chromeLaunch({ handleSIGTERM: false, handleSIGINT: false, handleSIGHUP: false }));
-  const c = cmp(v), out = [];
-  try {
-    await pool(c.runs, 4, async (r) => {
-      const t0 = Date.now(); work(v, r, true);
-      const { log, tries } = await tune(runDir(r), c.judge[r], face(runDir(r)), { scan: (q, win) => scanPlan(browser, r, q, win), take: takeOf(r), faceBottom: faceBottom(r) });
-      const best = log.filter((x) => x.kept).at(-1).grade, start = log[0].grade;
-      out.push(`${c.label[r]} ${start}->${best} (${tries} tries, ${log.filter((x) => x.kind === 'try' && x.kept).length} kept, ${((Date.now() - t0) / 1000).toFixed(0)}s)`);
-      say(v, `tuned ${out.at(-1)}`); work(v, r, false);
-    });
-  } finally { await browser.close(); }
-  return out.join(', ');
+  finally { await browser?.close().catch(() => {}); improving[r] = false; work(v, r, false); }
 }
 
 // your hand edits in the page (drag, resize, style picks) survive a rebuild.
@@ -489,36 +469,40 @@ const ZOOM_NAMES = { snap: 'punch zoom', slow: 'slow push', hold: 'tight crop', 
 const ZOOM_KINDS = Object.keys(ZOOM_NAMES);
 // Set by page pickers without an undo snapshot, so undo/redo must leave them as they are.
 const NOTE_KEYS = ['title', 'subtitle', 'titleEdited', 'titleDur', 'titleStyle', 'captionStyle', 'capHold', 'quietTitle', 'cam', 'camdrop', 'color', 'colorAmt', 'theme', 'hookSound', 'sfxEdits', 'sfxAdd', 'soundPack'];
-const keepNoteKeys = (cur, f) => { const p = JSON.parse(readFileSync(f, 'utf8')); for (const k of NOTE_KEYS) { if (k in cur) p[k] = cur[k]; else delete p[k]; } writeFileSync(f, JSON.stringify(p, null, 1)); };
+const keepNoteKeys = (cur, f) => { const p = JSON.parse(readFileSync(f, 'utf8')); for (const k of NOTE_KEYS) { if (k in cur) p[k] = cur[k]; else delete p[k]; } writeJson(f, p); };
 const HAND_KEYS = ['lockEdges', 'sfxAdd', 'titleAnim', 'titleWt', 'sfxEdits', 'hookCaps', 'titleY', 'titleDX', 'titleScale', 'titleMoved', 'titleStyle', 'theme', 'color', 'colorAmt', 'captionDY', 'captionScale', 'captionStyle', 'capHold', 'cam', 'camdrop', ...MOVE_KINDS, 'board', 'soundPack', 'hookSound', 'flow', 'quietTitle', 'titleDur', 'titleColor'];
 async function pipeline(v, fresh) {
   if (busy[v]) return;
-  if (!hasTake(v)) return say(v, 'waiting for the take (upstream steps still running)');
+  try { if (!hasTake(v)) return say(v, 'waiting for the take (upstream steps still running)'); } catch (e) { return say(v, `PIPELINE STOPPED: ${e.message}`); }
   busy[v] = true;
-  const c = cmp(v), dirs = c.runs.map(runDir), base = baseDir(v);
-  pipes[v] = null; pipeOf(v);
   const hand = {};
-  if (fresh) for (const d of dirs) {
-    if (existsSync(join(d, 'plan.json'))) { const p = JSON.parse(readFileSync(join(d, 'plan.json'), 'utf8')); hand[d] = Object.fromEntries((p.titleEdited ? [...HAND_KEYS, 'title', 'subtitle', 'titleEdited'] : HAND_KEYS).filter((k) => p[k] != null).map((k) => [k, p[k]])); }
-    if (existsSync(join(d, 'plan.orig.json'))) copyFileSync(join(d, 'plan.orig.json'), join(d, 'plan.json'));
-    for (const f of ['grades.jsonl', 'geom.json']) rmSync(join(d, f), { force: true });
-  }
+  let handBack = false;
+  const restoreHand = () => { for (const [d, h] of Object.entries(hand)) if (Object.keys(h).length && existsSync(join(d, 'plan.json'))) { const p = JSON.parse(readFileSync(join(d, 'plan.json'), 'utf8')); writeJson(join(d, 'plan.json'), { ...p, ...h }); } handBack = true; };
   try {
+    const c = { ...cmp(v) }, dirs = c.runs.map(runDir), base = baseDir(v);
+    pipes[v] = null; pipeOf(v);
+    if (fresh) for (const d of dirs) {
+      if (existsSync(join(d, 'plan.json'))) { const p = JSON.parse(readFileSync(join(d, 'plan.json'), 'utf8')); hand[d] = Object.fromEntries((p.titleEdited ? [...HAND_KEYS, 'title', 'subtitle', 'titleEdited'] : HAND_KEYS).filter((k) => p[k] != null).map((k) => [k, p[k]])); }
+      if (existsSync(join(d, 'plan.orig.json'))) copyFileSync(join(d, 'plan.orig.json'), join(d, 'plan.json'));
+      for (const f of ['grades.jsonl', 'geom.json']) rmSync(join(d, f), { force: true });
+    }
     await step(v, 'take', () => { const p = proxyOf(base); return `${secs(p).toFixed(0)} s take · source ${sourceLine(sourceOf(base))} · preview plays a 540x960 copy, export uses the source`; });
     await step(v, 'words', async () => { const t0 = Date.now(), w = await transcribe(base, rawOf(base), (s) => say(v, `transcribe: ${s}`)); return `${w.length} words, Parakeet text + Qwen3 word timing (${((Date.now() - t0) / 1000).toFixed(0)} s)`; });
     await step(v, 'name', async () => { const cur = cmp(v); if (cur.name) return `"${cur.name}" (already named)`; if (cur.title && cur.title !== String(cur.take ?? '').replace(/\.[^.]+$/, '')) { setName(v, cur.title, 'hand'); return `"${cur.title}" (title already set by hand)`; } const script = existsSync(join(RUNS, v, 'script.txt')) ? readFileSync(join(RUNS, v, 'script.txt'), 'utf8') : ''; const n = await nameTake(JSON.parse(readFileSync(join(base, 'words.json'), 'utf8')), script); if (!n) return 'no words, kept the file name'; setName(v, n, 'claude'); return `"${n}" from what is said (${provider()}, fast model)`; });
     await step(v, 'faces', () => { const t0 = Date.now(), f = facesOf(base); return `${f.filter((x) => x.face).length}/${f.length} frames with a face, ${f.filter((x) => x.hands.length).length} with hands (Apple Vision, ${((Date.now() - t0) / 1000).toFixed(1)} s)`; });
     await step(v, 'analyze', () => { const a = analysis(base); return `voice ${a.lufs} LUFS, caption band ${a.captionLuma}/255, face y ${a.face.y0}-${a.face.y1}, ${a.wpm} wpm, ${a.longPauses} pauses > 1 s`; });
     await step(v, 'ideas', async () => { if (existsSync(join(RUNS, v, 'ideas.json'))) return 'ideas.json already there'; const t0 = Date.now(), w = JSON.parse(readFileSync(join(base, 'words.json'), 'utf8')), script = existsSync(join(RUNS, v, 'script.txt')) ? readFileSync(join(RUNS, v, 'script.txt'), 'utf8') : ''; const i = await makeIdeas(join(RUNS, v), w, face(base), secs(proxyOf(base)), (s) => say(v, s), script); return `${Object.keys(i.cuts).join('/')} cuts, ${i.effects.length} effect ideas, judged (${((Date.now() - t0) / 1000).toFixed(0)} s, on your own AI plan)`; });
-    await step(v, 'presets', () => { if (!existsSync(join(RUNS, v, 'ideas.json'))) return 'no ideas.json yet - personas only'; const t0 = performance.now(), made = makePresets(RUNS, v, base === join(RUNS, v) ? v : c.runs[0], { force: fresh }); Object.assign(c, cmp(v)); const st = existsSync(join(RUNS, v, 'style.json')) ? JSON.parse(readFileSync(join(RUNS, v, 'style.json'), 'utf8')) : null; if (st) applyStyle(st, c.runs.map(runDir)); for (const [d, h] of Object.entries(hand)) if (Object.keys(h).length && existsSync(join(d, 'plan.json'))) { const p = JSON.parse(readFileSync(join(d, 'plan.json'), 'utf8')); writeFileSync(join(d, 'plan.json'), JSON.stringify({ ...p, ...h }, null, 1)); } return `${made.length} presets (clean/light/medium/heavy x full/60/30) in ${(performance.now() - t0).toFixed(0)} ms${st ? `, style copied from ${st.creator || st.url}` : ''}`; });
+    await step(v, 'presets', () => { if (!existsSync(join(RUNS, v, 'ideas.json'))) return 'no ideas.json yet - personas only'; const t0 = performance.now(), made = makePresets(RUNS, v, base === join(RUNS, v) ? v : c.runs[0], { force: fresh }); dropIndex(); Object.assign(c, cmp(v)); const st = existsSync(join(RUNS, v, 'style.json')) ? JSON.parse(readFileSync(join(RUNS, v, 'style.json'), 'utf8')) : null; if (st) applyStyle(st, c.runs.map(runDir)); restoreHand(); return `${made.length} presets (clean/light/medium/heavy x full/60/30) in ${(performance.now() - t0).toFixed(0)} ms${st ? `, style copied from ${st.creator || st.url}` : ''}`; });
     await step(v, 'title', () => cmp(v).runs.map((r) => { const y = placeTitle(r); return y ? `${cmp(v).label[r]} -> y ${y}` : null; }).filter(Boolean).join(', ') || 'every hook title already clear of the face');
     await step(v, 'plan', () => c.runs.map((r) => `${c.label[r]} ${layout(runDir(r)).total.toFixed(0)}s`).join(', '));
     await step(v, 'rules', () => c.runs.map((r) => `${c.label[r]} ${timing(layout(runDir(r))).length}`).join(', ') + ' timing issues');
     await step(v, 'grade', () => c.runs.map((r) => `${c.label[r]} ${runData(r).grade}`).join(', '));
     await step(v, 'board', () => boardCheck(v));
     say(v, 'PIPELINE DONE');
-  } catch (e) { say(v, `PIPELINE STOPPED: ${e.message}`); }
-  busy[v] = false;
+  } catch (e) { say(v, `PIPELINE STOPPED: ${e.message}`); } finally {
+    if (!handBack) try { restoreHand(); } catch (e) { say(v, `HAND EDITS NOT RESTORED: ${e.message}`); }
+    busy[v] = false;
+  }
 }
 
 function runData(r, cand) {
@@ -596,12 +580,20 @@ function ideasOf(v) {
   return { ...d, ideas: d.ideas.map((i) => ({ ...i, decision: dec[i.id]?.decision ?? null, decisionNote: dec[i.id]?.note ?? '', decisionOption: dec[i.id]?.option ?? null })) };
 }
 
+const brokenSaid = new Set();
 function videoData(v) {
-  const c = cmp(v), dir = hasTake(v) ? baseDir(v) : null;
+  const c = cmp(v), dir = hasTake(v) ? baseDir(v) : null, runs = [], broken = [];
+  for (const r of c.runs) {
+    try { runs.push(runData(r)); } catch (e) {
+      const error = String(e.message || e).slice(0, 200), label = c.label?.[r] ?? r;
+      broken.push({ run: r, label, error });
+      if (!brokenSaid.has(`${r}|${error}`)) { brokenSaid.add(`${r}|${error}`); say(v, `SKIPPED ${label} (${r}): ${error}`); }
+    }
+  }
   const favs = {}; for (const n of jsonl(join(RUNS, v, 'notes.jsonl'))) if (n.kind === 'fav') favs[n.run] = !!n.on;
   return { video: v, title: c.title, name: c.name ?? null, take: c.take, source: (() => { try { return sourceOf(baseDir(v)); } catch { return null; } })(), parts: PARTS, pipe: pipeOf(v), busy: !!busy[v], log: (logs[v] ?? []).slice(-8), working: [...(working[v] ?? [])], favs,
     analysis: dir && existsSync(join(takeDir(dir), 'analysis.json')) ? analysis(dir) : null, stamp: stamp(v), ideas: ideasOf(v),
-    notes: jsonl(join(RUNS, v, 'notes.jsonl')).slice(-30), runs: remember(v, c.runs.map((r) => runData(r))) };
+    notes: jsonl(join(RUNS, v, 'notes.jsonl')).slice(-30), runs: remember(v, runs), broken };
 }
 
 // caption-lab style over this version: its words in final-video time, our highlights as the style's accent words.
@@ -706,7 +698,7 @@ function allExports() {
   }
   return d;
 }
-function setName(v, name, by) { const f = join(RUNS, v, 'compare.json'), c = JSON.parse(readFileSync(f, 'utf8')); if (name) Object.assign(c, { name, nameBy: by }); else { delete c.name; delete c.nameBy; } writeFileSync(f, JSON.stringify(c, null, 1)); }
+function setName(v, name, by) { const f = join(RUNS, v, 'compare.json'), c = JSON.parse(readFileSync(f, 'utf8')); if (name) Object.assign(c, { name, nameBy: by }); else { delete c.name; delete c.nameBy; } writeJson(f, c); }
 
 // A new take: runs/<slug>/ with an empty compare.json; the pipeline fills it (transcribe, ideas, presets, scan, tune).
 const STYLES = join(ROOT, 'styles');
@@ -718,23 +710,26 @@ function newTake(name) {
   let v = slug0, n = 2;
   while (existsSync(join(RUNS, v))) v = `${slug0}-${n++}`;
   mkdirSync(join(RUNS, v), { recursive: true });
-  writeFileSync(join(RUNS, v, 'compare.json'), JSON.stringify({ title: stem, take: name, runs: [], label: {}, judge: {}, persona: {}, preset: {} }, null, 1));
+  writeJson(join(RUNS, v, 'compare.json'), { title: stem, take: name, runs: [], label: {}, judge: {}, persona: {}, preset: {} });
+  dropIndex();
   return v;
 }
 
 // Drop folder: a video saved into inbox/ (size steady for 3 s) moves into runs/<slug>/ and starts the pipeline.
 const INBOX = join(ROOT, 'inbox'), seenSize = {};
 setInterval(() => {
-  if (!existsSync(INBOX)) return;
-  for (const f of readdirSync(INBOX).filter((x) => /\.(mp4|mov|m4v|webm)$/i.test(x))) {
-    const size = statSync(join(INBOX, f)).size;
-    if (seenSize[f] !== size) { seenSize[f] = size; continue; }
-    delete seenSize[f];
-    const v = newTake(f);
-    renameSync(join(INBOX, f), join(RUNS, v, `raw.${f.split('.').pop().toLowerCase()}`));
-    say(v, `picked up inbox/${f}`);
-    pipeline(v, true);
-  }
+  try {
+    if (!existsSync(INBOX)) return;
+    for (const f of readdirSync(INBOX).filter((x) => /\.(mp4|mov|m4v|webm)$/i.test(x))) {
+      const size = statSync(join(INBOX, f)).size;
+      if (seenSize[f] !== size) { seenSize[f] = size; continue; }
+      delete seenSize[f];
+      const v = newTake(f);
+      renameSync(join(INBOX, f), join(RUNS, v, `raw.${f.split('.').pop().toLowerCase()}`)); dropIndex();
+      say(v, `picked up inbox/${f}`);
+      pipeline(v, true);
+    }
+  } catch (e) { console.error(`inbox check failed: ${e.message}`); }
 }, 3000);
 
 createServer(async (req, res) => {
@@ -769,7 +764,7 @@ createServer(async (req, res) => {
     }
     if (req.method === 'POST' && (m = path.match(/^\/api\/style\/([0-9a-f]{10})\/use\/([\w-]+)$/)) && videos().includes(m[2])) {
       const s = styleOf(m[1]); if (!s) return json(res, { ok: false, error: 'no such style' });
-      writeFileSync(join(RUNS, m[2], 'style.json'), JSON.stringify(s, null, 1)); applyStyle(s, cmp(m[2]).runs.map(runDir));
+      writeJson(join(RUNS, m[2], 'style.json'), s); applyStyle(s, cmp(m[2]).runs.map(runDir));
       say(m[2], `copied the style of ${s.creator || s.url}: captions ${s.captionStyle}, hook ${s.titleStyle}, theme ${s.theme}, ${s.level} edit`);
       return json(res, { ok: true, run: styleRun(m[2], s) });
     }
@@ -853,7 +848,7 @@ createServer(async (req, res) => {
       if (!ref) return json(res, { ok: false, error: 'no sound' });
       if (!(d.banned ?? []).some((x) => x.file === ref)) (d.banned ??= []).push({ file: ref, why: `You ${new Date().toISOString().slice(5, 10)}: banned from the sounds row` });
       for (const pk of Object.values(d.packs)) for (const sl of Object.values(pk.slots ?? {})) for (const k of ['approved', 'candidates']) if (sl[k]) sl[k] = sl[k].filter((x) => x !== ref);
-      writeFileSync(f, JSON.stringify(d, null, 2));
+      writeJson(f, d, 2);
       for (const v of videos()) pipeline(v, false);
       return json(res, { ok: true });
     }
@@ -864,7 +859,7 @@ createServer(async (req, res) => {
     if (req.method === 'POST' && (m = path.match(/^\/api\/geom\/([\w-]+)$/))) {
       const b = await body(req), cand = url.searchParams.get('cand');
       if (cand && cands[cand]) { cands[cand].done(b); return json(res, { ok: true }); }
-      writeFileSync(geomFile(m[1]), JSON.stringify(b, null, 1));
+      writeJson(geomFile(m[1]), b);
       return json(res, { ok: true });
     }
     if (req.method === 'POST' && path === '/api/upload') {
@@ -873,8 +868,8 @@ createServer(async (req, res) => {
       const part = join(RUNS, `.upload-${Date.now()}.part`);
       await new Promise((ok, no) => req.pipe(createWriteStream(part)).on('finish', ok).on('error', no));
       const v = newTake(name), file = join(RUNS, v, `raw.${ext}`), st = styleOf(url.searchParams.get('style') || '');
-      renameSync(part, file);
-      if (st) writeFileSync(join(RUNS, v, 'style.json'), JSON.stringify(st, null, 1));
+      renameSync(part, file); dropIndex();
+      if (st) writeJson(join(RUNS, v, 'style.json'), st);
       say(v, `got ${name} (${(statSync(file).size / 1e6).toFixed(1)} MB) from the page`);
       pipeline(v, true);
       return json(res, { ok: true, video: v, styled: !!st });
@@ -906,14 +901,15 @@ createServer(async (req, res) => {
         copyFileSync(join(edits, redos.at(-1)), planFile); keepNoteKeys(cur, planFile); rmSync(join(edits, redos.at(-1)));
         label = 'You: redo';
       } else if (m[1] === 'move') {
-        const b = await body(req), dx = Math.round(+b.dx || 0), dy = Math.round(+b.dy || 0), p = JSON.parse(readFileSync(planFile, 'utf8')), e = (p.effects ?? [])[+b.k];
+        const b = await body(req), dx = Math.round(+b.dx || 0), dy = Math.round(+b.dy || 0);
+        let p = JSON.parse(readFileSync(planFile, 'utf8')), e = (p.effects ?? [])[+b.k];
         const gapK = +(b.item?.k ?? b.k);
         if (gapK >= GAP_K && ['delete', 'fx', 'fxtime', 'fxprops', 'fxswap'].includes(b.what)) {
           if (b.what !== 'delete') return json(res, { ok: false, error: 'This is a held beat. Delete it to remove the pause.' });
           if (!(p.gaps ?? [])[gapK - GAP_K]) return json(res, { ok: false, error: 'no held beat there' });
           copyFileSync(planFile, join(edits, `${String(snaps.length + 1).padStart(3, '0')}.json`));
           p.gaps.splice(gapK - GAP_K, 1);
-          writeFileSync(planFile, JSON.stringify(p, null, 1));
+          writeJson(planFile, p);
           label = 'You: deleted held beat';
         } else if (b.what === 'delete') {
           const it = b.item ?? {}, list = it.what === 'zoom' ? null : p.effects ?? [];
@@ -927,12 +923,12 @@ createServer(async (req, res) => {
           else if (it.what === 'title') { p.title = ''; p.subtitle = ''; }
           else if (it.kind === 'snap') { p.snap = p.snap.filter((i) => i !== +it.k); if (p.snapSecs) delete p.snapSecs[it.k]; if (p.snapZoom) delete p.snapZoom[it.k]; }
           else p[it.kind].splice(+it.k, 1);
-          writeFileSync(planFile, JSON.stringify(p, null, 1));
+          writeJson(planFile, p);
           label = `You: deleted ${gone}`;
         } else if (b.what === 'flow') {
           copyFileSync(planFile, join(edits, `${String(snaps.length + 1).padStart(3, '0')}.json`));
           if (b.on) p.flow = p.flow || true; else delete p.flow;
-          writeFileSync(planFile, JSON.stringify(p, null, 1));
+          writeJson(planFile, p);
           label = `You: always-moving camera ${b.on ? 'on' : 'off'}`;
         } else if (b.what === 'zoom') {
           const L = layout(dir, p), t = Math.max(0, +b.t || 0), d = Math.max(0.4, +b.dur || 2.4), kind = b.kind, rng = wordsIn(L, t, d);
@@ -944,7 +940,7 @@ createServer(async (req, res) => {
             if (!Object.keys(p.snapSecs).length) delete p.snapSecs;
           } else if (b.add) (p[kind] ??= []).push(kind === 'hold' ? [rng[0], rng[1], 1.35] : rng);
           else { const list = p[kind] ?? [], old = list[+b.k]; if (!old) return json(res, { ok: false, error: 'no such zoom' }); list[+b.k] = old[2] != null ? [rng[0], rng[1], old[2]] : kind === 'hold' ? [rng[0], rng[1], 1.35] : rng; }
-          writeFileSync(planFile, JSON.stringify(p, null, 1));
+          writeJson(planFile, p);
           const name = ZOOM_NAMES[kind];
           label = `You: ${b.add ? 'added' : b.mode === 'move' ? 'moved' : 'resized'} ${name} to ${t.toFixed(1)}-${(t + d).toFixed(1)} s ("${L.words.slice(rng[0], rng[1] + 1).map((w) => w.text).join(' ').slice(0, 40)}")`;
         } else if (b.what === 'zoomswap' || b.what === 'zoomprops') {
@@ -963,7 +959,7 @@ createServer(async (req, res) => {
             else (p[b.to] ??= []).push(b.to === 'hold' ? [rng[0], rng[1], 1.35] : rng);
             label = `You: switched ${ZOOM_NAMES[from]} to ${ZOOM_NAMES[b.to]}`;
           }
-          writeFileSync(planFile, JSON.stringify(p, null, 1));
+          writeJson(planFile, p);
         } else if (b.what === 'fxswap') {
           const to = byId[b.fx];
           if (!e || !to || to.group !== byId[e.fx]?.group || to.group !== 'layout') return json(res, { ok: false, error: 'can only switch a layout to another layout' });
@@ -971,14 +967,14 @@ createServer(async (req, res) => {
           const was = e.fx; e.fx = to.id;
           if ('title' in to.params && !e.title) e.title = e.text;
           if ('text' in to.params && !e.text) e.text = e.title;
-          writeFileSync(planFile, JSON.stringify(p, null, 1));
+          writeJson(planFile, p);
           label = `You: switched layout ${byId[was].name} -> ${to.name}`;
         } else if (b.what === 'fxtime') {
           const t = +b.t, d = +b.dur;
           if (!e || !(t >= 0) || !(d >= 0.4)) return json(res, { ok: false, error: 'bad effect time' });
           copyFileSync(planFile, join(edits, `${String(snaps.length + 1).padStart(3, '0')}.json`));
           e.t = +t.toFixed(2); e.dur = +d.toFixed(2);
-          writeFileSync(planFile, JSON.stringify(p, null, 1));
+          writeJson(planFile, p);
           label = `You: ${b.mode === 'move' ? 'moved' : 'resized'} ${e.fx} to ${e.t.toFixed(1)}-${(e.t + e.dur).toFixed(1)} s`;
         } else if (b.what === 'titleprops') {
           const v = b.props ?? {}, said = [], cl = (x, lo, hi) => Math.max(lo, Math.min(hi, +x));
@@ -991,17 +987,22 @@ createServer(async (req, res) => {
           if (v.anim != null) { if (/^[a-z]+$/.test(v.anim) && v.anim !== 'look') p.titleAnim = v.anim; else delete p.titleAnim; said.push(`entrance ${p.titleAnim || 'look default'}`); }
           if (v.animate != null && p.titleStyle && p.titleStyle !== 'serif') { const base = p.titleStyle.replace(/-static$/, ''); p.titleStyle = v.animate ? base : `${base}-static`; said.push(v.animate ? 'animated' : 'still'); }
           if (!said.length) return json(res, { ok: false, error: 'nothing to set' });
-          writeFileSync(planFile, JSON.stringify(p, null, 1));
+          writeJson(planFile, p);
           label = `You: hook ${said.join(', ')}`;
         } else if (b.what === 'fxprops') {
           const defs = e && byId[e.fx]?.props, set = Object.entries(b.props ?? {}).map(([k, v]) => [defs?.find((d) => d.key === k), v]).map(([d, v]) => [d, d?.options ? String(v) : +v]).filter(([d, v]) => d && (d.key === 'meBg' ? v === '' || backgrounds().some((f) => `/bglib/${f}` === v) : d.options ? d.options.some((o) => o[0] === v) : Number.isFinite(v)));
           if (!set.length) return json(res, { ok: false, error: 'nothing to set' });
           const pic = set.find(([d, v]) => d.key === 'top' && (v === 'redraw' || (v === 'picture' && !e.svg)));
-          if (pic) { try { e.svg = await drawForLayout(dir, e); pic[1] = 'picture'; } catch (er) { return json(res, { ok: false, error: er.message }); } }
-          copyFileSync(planFile, join(edits, `${String(snaps.length + 1).padStart(3, '0')}.json`));
+          if (pic) {
+            let svg; try { svg = await drawForLayout(dir, e); } catch (er) { return json(res, { ok: false, error: er.message }); }
+            const was = e.fx; p = JSON.parse(readFileSync(planFile, 'utf8')); e = (p.effects ?? [])[+b.k];
+            if (!e || e.fx !== was) return json(res, { ok: false, error: 'that card changed while the picture was drawing - try again' });
+            e.svg = svg; pic[1] = 'picture';
+          }
+          copyFileSync(planFile, join(edits, `${String(readdirSync(edits).filter((f) => /^\d+\.json$/.test(f)).length + 1).padStart(3, '0')}.json`));
           const targets = b.all ? (p.effects ?? []).filter((x) => x.fx === e.fx) : [e];
           for (const t of targets) for (const [d, v] of set) t[d.key] = d.options ? v : Math.max(d.min, Math.min(d.max, v));
-          writeFileSync(planFile, JSON.stringify(p, null, 1));
+          writeJson(planFile, p);
           label = `You: ${b.all ? `all ${targets.length} ` : ''}${byId[e.fx].name} ${set.map(([d]) => `${d.label.toLowerCase()} ${e[d.key]}`).join(', ')}`;
         } else {
         const set = b.set && typeof b.set === 'object' ? b.set : null, sc = (x) => Math.max(0.3, Math.min(3, +x || 1));
@@ -1016,7 +1017,7 @@ createServer(async (req, res) => {
         } else if (b.what === 'title') { p.titleY = Math.max(120, Math.min(1800, (camTitle(p) ? CAM_TITLE_Y : p.titleY ?? 360) + dy)); p.titleDX = Math.max(-500, Math.min(500, (p.titleDX ?? 0) + dx)); p.titleMoved = true; }
         else if (b.what === 'captions') p.captionDY = Math.max(-1100, Math.min(500, (p.captionDY ?? 0) + dy));
         else { e.dx = (e.dx ?? 0) + dx; e.dy = (e.dy ?? 0) + dy; }
-        writeFileSync(planFile, JSON.stringify(p, null, 1));
+        writeJson(planFile, p);
         const dir2 = (n, pos, neg) => (n ? `${Math.abs(n)} px ${n > 0 ? pos : neg}` : '');
         if (!set) label = `You: moved ${b.what === 'fx' ? `${e.fx} card` : b.what === 'title' ? 'hook title' : 'captions'} ${[dir2(dy, 'down', 'up'), b.what === 'captions' ? '' : dir2(dx, 'right', 'left')].filter(Boolean).join(', ')}`;
         }
@@ -1033,7 +1034,7 @@ createServer(async (req, res) => {
         p.pauseSet = (p.pauseSet ?? []).filter((q) => q.after !== i);
         if (b0.op === 'pause') p.unsqueeze = [...(p.unsqueeze ?? []), ...sq];
         else p.pauseSet.push({ after: i, from: +from.toFixed(2), to: +to.toFixed(2), secs: +secs.toFixed(2) });
-        writeFileSync(planFile, JSON.stringify(p, null, 1));
+        writeJson(planFile, p);
         label = b0.op === 'pause' ? `You: removed the pause cut after "${w[i].text}"` : `You: pause after "${w[i].text}" set to ${secs.toFixed(2)} s`;
       } else if (b0.op === 'batch') {
         const w = layout(dir).words, ok = (l) => (Array.isArray(l) ? l : []).map(Number).filter((i) => Number.isInteger(i) && i >= 0 && i < w.length);
@@ -1043,17 +1044,17 @@ createServer(async (req, res) => {
         let p = JSON.parse(readFileSync(planFile, 'utf8'));
         if (keep.length) p = editWords(p, w, keep, true);
         if (cut.length) p = editWords(p, w, cut, false);
-        writeFileSync(planFile, JSON.stringify(p, null, 1));
+        writeJson(planFile, p);
         label = `You: ${[cut.length && `cut ${cut.length} words ("${say3(cut)}")`, keep.length && `brought back ${keep.length} ("${say3(keep)}")`].filter(Boolean).join(', ')}`;
       } else {
         const b = b0, from = +b.from, to = +(b.to ?? b.from), keep = b.op === 'keep', p = JSON.parse(readFileSync(planFile, 'utf8')), w = layout(dir).words;
         if (!(from >= 0 && to >= from && to < w.length)) return json(res, { ok: false, error: 'bad word range' });
         copyFileSync(planFile, join(edits, `${String(snaps.length + 1).padStart(3, '0')}.json`));
-        writeFileSync(planFile, JSON.stringify(editWords(p, w, Array.from({ length: to - from + 1 }, (_, k) => from + k), keep), null, 1));
+        writeJson(planFile, editWords(p, w, Array.from({ length: to - from + 1 }, (_, k) => from + k), keep));
         label = `You: ${keep ? 'bring back' : 'cut'} "${w.slice(from, to + 1).map((x) => x.text).join(' ').slice(0, 60)}"`;
       }
       if (!['undo', 'redo'].includes(m[1])) clearRedo(edits);
-      if (existsSync(geomFile(r))) writeFileSync(geomFile(r), JSON.stringify({ ...geomAll(r), stale: true }, null, 1));
+      if (existsSync(geomFile(r))) writeJson(geomFile(r), { ...geomAll(r), stale: true });
       const after = runData(r);
       appendFileSync(join(dir, 'grades.jsonl'), JSON.stringify({ i: hist(r).length, at: new Date().toISOString(), kind: 'edit', label: by(label), grade: after.grade, from: before, delta: +(after.grade - before).toFixed(1), kept: true, parts: after.parts }) + '\n');
       appendFileSync(join(RUNS, v, 'notes.jsonl'), JSON.stringify({ kind: 'edit', run: r, text: by(label), at: new Date().toISOString() }) + '\n');
@@ -1074,7 +1075,7 @@ createServer(async (req, res) => {
       const snaps = readdirSync(edits).filter((f) => /^\d+\.json$/.test(f)).sort(), p = JSON.parse(readFileSync(planFile, 'utf8'));
       copyFileSync(planFile, join(edits, `${String(snaps.length + 1).padStart(3, '0')}.json`));
       p.effects = [...(p.effects ?? []), e];
-      writeFileSync(planFile, JSON.stringify(p, null, 1));
+      writeJson(planFile, p);
       clearRedo(edits);
       const after = runData(r), fx = after.fx.find((x) => x.k === p.effects.length - 1), label = `You: Overlay + ${b.mode} at ${fx ? fx.t0.toFixed(1) : '?'} s (${e.fx === 'concept-card' ? 'drawn picture' : e.name})`;
       appendFileSync(join(RUNS, v, 'notes.jsonl'), JSON.stringify({ kind: 'edit', run: r, text: by(label), at: new Date().toISOString() }) + '\n');
@@ -1096,9 +1097,9 @@ createServer(async (req, res) => {
       const snaps = readdirSync(edits).filter((f) => /^\d+\.json$/.test(f)).sort(), p = JSON.parse(readFileSync(planFile, 'utf8'));
       copyFileSync(planFile, join(edits, `${String(snaps.length + 1).padStart(3, '0')}.json`));
       p.effects = [...(p.effects ?? []), e];
-      writeFileSync(planFile, JSON.stringify(p, null, 1));
+      writeJson(planFile, p);
       clearRedo(edits);
-      if (existsSync(geomFile(r))) writeFileSync(geomFile(r), JSON.stringify({ ...geomAll(r), stale: true }, null, 1));
+      if (existsSync(geomFile(r))) writeJson(geomFile(r), { ...geomAll(r), stale: true });
       const after = runData(r), label = `You: dropped ${name} at ${e.t.toFixed(1)} s (${kind}, ${e.dur.toFixed(1)} s)`;
       appendFileSync(join(dir, 'grades.jsonl'), JSON.stringify({ i: hist(r).length, at: new Date().toISOString(), kind: 'edit', label: by(label), grade: after.grade, from: before, delta: +(after.grade - before).toFixed(1), kept: true, parts: after.parts }) + '\n');
       appendFileSync(join(RUNS, v, 'notes.jsonl'), JSON.stringify({ kind: 'edit', run: r, text: by(label), at: new Date().toISOString() }) + '\n');
@@ -1109,7 +1110,7 @@ createServer(async (req, res) => {
       const v = m[1], b = await body(req);
       if (!videos().includes(v)) return json(res, { ok: false, error: 'no such video' });
       let run;
-      try { run = makeFlowRun(RUNS, v, String(b.from || '')); } catch (er) { return json(res, { ok: false, error: er.message }); }
+      try { run = makeFlowRun(RUNS, v, String(b.from || '')); } catch (er) { return json(res, { ok: false, error: er.message }); } finally { dropIndex(); }
       say(v, `Always moving version from ${cmp(v).label[b.from]}: ${run}`);
       pipeline(v, false);
       return json(res, { ok: true, run });
@@ -1123,7 +1124,7 @@ createServer(async (req, res) => {
       const v = m[1], b = await body(req);
       if (!videos().includes(v)) return json(res, { ok: false, error: 'no such video' });
       let out;
-      try { out = makeLayoutRuns(RUNS, v, String(b.from || '')); } catch (er) { return json(res, { ok: false, error: er.message }); }
+      try { out = makeLayoutRuns(RUNS, v, String(b.from || '')); } catch (er) { return json(res, { ok: false, error: er.message }); } finally { dropIndex(); }
       say(v, `Layout versions from ${cmp(v).label[b.from]}: ${out.made.length} made, layouts at ${out.spots.map(([a, z]) => `${a}-${z} s`).join(', ')}`);
       pipeline(v, false);
       return json(res, { ok: true, ...out });
@@ -1166,9 +1167,9 @@ createServer(async (req, res) => {
       const snaps = readdirSync(edits).filter((f) => /^\d+\.json$/.test(f)).sort(), p = JSON.parse(readFileSync(planFile, 'utf8'));
       copyFileSync(planFile, join(edits, `${String(snaps.length + 1).padStart(3, '0')}.json`));
       p.effects = [...(p.effects ?? []), e];
-      writeFileSync(planFile, JSON.stringify(p, null, 1));
+      writeJson(planFile, p);
       clearRedo(edits);
-      if (existsSync(geomFile(r))) writeFileSync(geomFile(r), JSON.stringify({ ...geomAll(r), stale: true }, null, 1));
+      if (existsSync(geomFile(r))) writeJson(geomFile(r), { ...geomAll(r), stale: true });
       const after = runData(r), label = `You: add ${e.fx} at ${t.toFixed(1)} s - ${e.why ?? ''}`.slice(0, 160), added = after.fx.find((x) => x.k === p.effects.length - 1);
       appendFileSync(join(dir, 'grades.jsonl'), JSON.stringify({ i: hist(r).length, at: new Date().toISOString(), kind: 'edit', label: by(label), grade: after.grade, from: before, delta: +(after.grade - before).toFixed(1), kept: true, parts: after.parts }) + '\n');
       appendFileSync(join(RUNS, v, 'notes.jsonl'), JSON.stringify({ kind: 'edit', run: r, text: by(label), at: new Date().toISOString() }) + '\n');
@@ -1198,24 +1199,25 @@ createServer(async (req, res) => {
     if (req.method === 'POST' && (m = path.match(/^\/api\/note\/([\w-]+)$/))) {
       const d = { ...(await body(req)), at: new Date().toISOString() };
       if (!d.kind) return json(res, { ok: false, error: 'empty note' });
+      if (d.id != null && d.id !== '') { let seen = false; try { seen = jsonl(join(RUNS, m[1], 'notes.jsonl')).slice(-100).some((n) => n.id === d.id); } catch {} if (seen) return json(res, { ok: true, got: d, dup: true }); }
       if (d.shot && d.run && d.t != null && cmp(m[1]).runs.includes(d.run)) {
         try { const dir = join(RUNS, m[1], 'note-shots'), f = join(dir, `${Date.now()}-${(+d.t).toFixed(1)}.jpg`); mkdirSync(dir, { recursive: true }); copyFileSync(await shot(d.run, Math.max(0, +d.t)), f); d.shot = f; } catch (e) { d.shot = null; d.shotError = String(e.message || e); }
       }
       appendFileSync(join(RUNS, m[1], 'notes.jsonl'), JSON.stringify(d) + '\n');
       console.log(`NOTE ${JSON.stringify(d)}`);
-      if (d.kind === 'caption-style' && d.run && cmp(m[1]).runs.includes(d.run) && /^[\w-]+$/.test(d.text)) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); p.captionStyle = d.text; writeFileSync(f, JSON.stringify(p, null, 1)); }
-      if (d.kind === 'hook-style' && d.run && cmp(m[1]).runs.includes(d.run)) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); p.titleStyle = d.text; writeFileSync(f, JSON.stringify(p, null, 1)); }
-      if (d.kind === 'hook-text' && d.run && cmp(m[1]).runs.includes(d.run) && typeof d.title === 'string') { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); p.title = d.title.trim().slice(0, 120); p.subtitle = String(d.subtitle ?? '').trim().slice(0, 120); p.titleEdited = true; writeFileSync(f, JSON.stringify(p, null, 1)); }
-      if (d.kind === 'hook-len' && d.run && cmp(m[1]).runs.includes(d.run) && +d.text > 0) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); p.titleDur = +Math.max(0.5, Math.min(15, +d.text)).toFixed(2); writeFileSync(f, JSON.stringify(p, null, 1)); }
-      if (d.kind === 'cap-hold' && d.run && cmp(m[1]).runs.includes(d.run)) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); if (d.text === 'on') p.capHold = true; else delete p.capHold; writeFileSync(f, JSON.stringify(p, null, 1)); }
-      if (d.kind === 'hook-quiet' && d.run && cmp(m[1]).runs.includes(d.run)) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); p.quietTitle = d.text === 'on'; writeFileSync(f, JSON.stringify(p, null, 1)); }
-      if (d.kind === 'hook-cam' &&d.run && cmp(m[1]).runs.includes(d.run) && (d.text === 'none' || CAMS[d.text])) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); delete p.cam; p.camdrop = setHookDrop(layout(runDir(d.run), p), d.text !== 'none'); writeFileSync(f, JSON.stringify(p, null, 1)); }
-      if (d.kind === 'color-grade' && d.run && cmp(m[1]).runs.includes(d.run) && gradeId(d.text) === d.text) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); p.color = d.text; p.colorAmt = gradeAmt(d.amt); writeFileSync(f, JSON.stringify(p, null, 1)); }
-      if (d.kind === 'theme' && d.run && cmp(m[1]).runs.includes(d.run) && themeId(d.text) === d.text) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); p.theme = d.text; writeFileSync(f, JSON.stringify(p, null, 1)); }
-      if (d.kind === 'hook-sound' && d.run && cmp(m[1]).runs.includes(d.run) && (d.text === 'none' || (soundPacks().hookSounds ?? []).some((x) => x.id === d.text))) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); if (d.text === 'none') delete p.hookSound; else p.hookSound = d.text; writeFileSync(f, JSON.stringify(p, null, 1)); }
-      if (d.kind === 'sfx-edit' && d.run && cmp(m[1]).runs.includes(d.run) && typeof d.from === 'string' && Number.isFinite(+d.cue) && (d.to === null || (typeof d.to === 'string' && sfxPath(d.to)))) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')), E = (p.sfxEdits ??= []), e = E.find((x) => Math.abs(x.at - +d.cue) < 0.06 && (x.to === d.from || x.from === d.from)); if (e) e.to = d.to; else E.push({ at: +d.cue, from: d.from, to: d.to }); writeFileSync(f, JSON.stringify(p, null, 1)); }
-      if (d.kind === 'sfx-add' && d.run && cmp(m[1]).runs.includes(d.run) && Number.isFinite(+d.t) && typeof d.to === 'string' && sfxPath(d.to)) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); (p.sfxAdd ??= []).push({ t: +(+d.t).toFixed(2), ref: d.to }); writeFileSync(f, JSON.stringify(p, null, 1)); }
-      if (d.kind === 'sound-pack' && d.run && cmp(m[1]).runs.includes(d.run) && soundPacks().packs[d.text]) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); p.soundPack = d.text; writeFileSync(f, JSON.stringify(p, null, 1)); }
+      if (d.kind === 'caption-style' && d.run && cmp(m[1]).runs.includes(d.run) && /^[\w-]+$/.test(d.text)) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); p.captionStyle = d.text; writeJson(f, p); }
+      if (d.kind === 'hook-style' && d.run && cmp(m[1]).runs.includes(d.run)) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); p.titleStyle = d.text; writeJson(f, p); }
+      if (d.kind === 'hook-text' && d.run && cmp(m[1]).runs.includes(d.run) && typeof d.title === 'string') { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); p.title = d.title.trim().slice(0, 120); p.subtitle = String(d.subtitle ?? '').trim().slice(0, 120); p.titleEdited = true; writeJson(f, p); }
+      if (d.kind === 'hook-len' && d.run && cmp(m[1]).runs.includes(d.run) && +d.text > 0) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); p.titleDur = +Math.max(0.5, Math.min(15, +d.text)).toFixed(2); writeJson(f, p); }
+      if (d.kind === 'cap-hold' && d.run && cmp(m[1]).runs.includes(d.run)) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); if (d.text === 'on') p.capHold = true; else delete p.capHold; writeJson(f, p); }
+      if (d.kind === 'hook-quiet' && d.run && cmp(m[1]).runs.includes(d.run)) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); p.quietTitle = d.text === 'on'; writeJson(f, p); }
+      if (d.kind === 'hook-cam' &&d.run && cmp(m[1]).runs.includes(d.run) && (d.text === 'none' || CAMS[d.text])) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); delete p.cam; p.camdrop = setHookDrop(layout(runDir(d.run), p), d.text !== 'none'); writeJson(f, p); }
+      if (d.kind === 'color-grade' && d.run && cmp(m[1]).runs.includes(d.run) && gradeId(d.text) === d.text) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); p.color = d.text; p.colorAmt = gradeAmt(d.amt); writeJson(f, p); }
+      if (d.kind === 'theme' && d.run && cmp(m[1]).runs.includes(d.run) && themeId(d.text) === d.text) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); p.theme = d.text; writeJson(f, p); }
+      if (d.kind === 'hook-sound' && d.run && cmp(m[1]).runs.includes(d.run) && (d.text === 'none' || (soundPacks().hookSounds ?? []).some((x) => x.id === d.text))) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); if (d.text === 'none') delete p.hookSound; else p.hookSound = d.text; writeJson(f, p); }
+      if (d.kind === 'sfx-edit' && d.run && cmp(m[1]).runs.includes(d.run) && typeof d.from === 'string' && Number.isFinite(+d.cue) && (d.to === null || (typeof d.to === 'string' && sfxPath(d.to)))) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')), E = (p.sfxEdits ??= []), e = E.find((x) => Math.abs(x.at - +d.cue) < 0.06 && (x.to === d.from || x.from === d.from)); if (e) e.to = d.to; else E.push({ at: +d.cue, from: d.from, to: d.to }); writeJson(f, p); }
+      if (d.kind === 'sfx-add' && d.run && cmp(m[1]).runs.includes(d.run) && Number.isFinite(+d.t) && typeof d.to === 'string' && sfxPath(d.to)) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); (p.sfxAdd ??= []).push({ t: +(+d.t).toFixed(2), ref: d.to }); writeJson(f, p); }
+      if (d.kind === 'sound-pack' && d.run && cmp(m[1]).runs.includes(d.run) && soundPacks().packs[d.text]) { const f = join(runDir(d.run), 'plan.json'), p = JSON.parse(readFileSync(f, 'utf8')); p.soundPack = d.text; writeJson(f, p); }
       return json(res, { ok: true, got: d });
     }
     res.writeHead(404); res.end();
@@ -1227,4 +1229,4 @@ createServer(async (req, res) => {
 }).listen(PORT, '127.0.0.1', async () => {
   console.log(`LIVE http://yapcut-preview.localhost:${PORT}/  (${videos().join(', ')})`);
   if (!process.argv.includes('--no-pipeline')) for (const v of videos()) await pipeline(v, false);
-});
+}).on('error', (e) => { console.error(`server error, exiting: ${e.message}`); process.exit(1); });

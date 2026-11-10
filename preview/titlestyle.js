@@ -60,7 +60,7 @@
     var l = document.createElement('link'); l.rel = 'stylesheet';
     l.href = 'https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter+Tight:wght@700;800&family=Instrument+Serif:ital@0;1&family=Fraunces:ital,wght@0,800;1,600&display=swap';
     document.head.appendChild(l);
-    var s = document.createElement('style'); s.textContent = css; document.head.appendChild(s);
+    var s = document.createElement('style'); s.setAttribute('data-keep', ''); s.textContent = css; document.head.appendChild(s);
   }
   function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
   function ease(p) { return 1 - Math.pow(1 - p, 3); }

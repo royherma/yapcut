@@ -701,7 +701,8 @@ textarea{height:46px}.sent{max-height:76px}
 .btn.lay{display:inline-flex;align-items:center;gap:6px}.layic{flex:none}.laywhat{color:var(--mute,#9aa3b2);font-size:12px;margin:0 8px;flex:1 1 300px;min-width:240px;line-height:1.3}
 
 body.simple #jevb,body.simple #railL,body.simple #railR,body.simple #left,body.simple #issPanel,body.simple #medPanel,body.simple #bRev{display:none!important}
-body.simple:not(.claude-on) #fbPanel{display:none!important}
+body.simple:not(.claude-on) #fbPanel :is(#ctx,#note,#bSend,#bDraft,#drH,#drafts,#sentH,#sent){display:none!important}
+body.simple:not(.claude-on) #fbPanel{flex:none!important;height:auto!important}
 .viewsw button{white-space:nowrap;padding:0 9px}
 @media (max-width:1700px){#vidb{max-width:130px}}
 </style>
@@ -792,7 +793,7 @@ body.simple:not(.claude-on) #fbPanel{display:none!important}
         </div>
         <div class="ph" id="drH" style="padding-top:0" hidden>Drafts<span class="r"><button class="btn sm" id="bDrClr" title="Delete every draft for this take">Clear</button><button class="btn sm pri" id="bAll" title="Send every draft to Claude, each with a picture of its frame">Send all</button></span></div>
         <div class="drafts" id="drafts" hidden></div>
-        <div class="ph" style="padding-top:0">Sent to Claude<span class="cl-on" id="clOn"></span><span class="r" id="sentN"></span></div>
+        <div class="ph" id="sentH" style="padding-top:0">Sent to Claude<span class="cl-on" id="clOn"></span><span class="r" id="sentN"></span></div>
         <div class="sent" id="sent"></div>
       </div>
     </section>
@@ -891,11 +892,15 @@ function syncUrl() {
 }
 var SZK = 'yapcut.sz.v1';
 var saveT;
+function saveNow() {
+  clearTimeout(saveT);
+  var live = S.noteOk, nv = live ? S.video : LOADED.noteV, nt = live ? ($('note') ? $('note').value : '') : LOADED.note;
+  var us = live ? S.notes.filter(function (n) { return n._p || n._f; }).map(function (n) { var o = Object.assign({}, n); delete o._p; delete o._f; return o; }) : LOADED.unsent;
+  try { localStorage.setItem(KEY, JSON.stringify({ video: S.video, sel: S.sel, mode: S.mode, cmp: S.cmp, pos: S.pos, sound: S.sound, speed: S.speed, loop: S.loop, cf: S.cf, psort: S.psort, style: S.style, hook: S.hook, theme: S.theme, color: S.color, noteV: nv, note: nt, unsent: us })); } catch (e) {}
+}
 function save() {
   clearTimeout(saveT);
-  saveT = setTimeout(function () {
-    try { localStorage.setItem(KEY, JSON.stringify({ video: S.video, sel: S.sel, mode: S.mode, cmp: S.cmp, pos: S.pos, sound: S.sound, speed: S.speed, loop: S.loop, cf: S.cf, psort: S.psort, style: S.style, hook: S.hook, theme: S.theme, color: S.color })); } catch (e) {}
-  }, 250);
+  saveT = setTimeout(saveNow, 250);
   syncUrl();
 }
 load();
@@ -968,7 +973,7 @@ function maybeScan(force) {
 function refreshRuns() { renderHeader(); renderInfo(); syncCols(); }
 function toggleFav(id) {
   var r = runOf(id); if (!r) return; var on = !isFav(r); S.favOv[id] = on; refreshRuns();
-  api('/api/note/' + encodeURIComponent(S.video), { method: 'POST', body: JSON.stringify({ kind: 'fav', run: id, on: on, label: r.label, grade: r.grade, t: +(S.t || 0).toFixed(2) }) })
+  api('/api/note/' + encodeURIComponent(S.video), { method: 'POST', body: JSON.stringify({ id: noteId(), kind: 'fav', run: id, on: on, label: r.label, grade: r.grade, t: +(S.t || 0).toFixed(2) }) })
     .then(function (j) { if (!j.ok) throw new Error(j.error || 'rejected'); toast((on ? 'Favorited ' : 'Removed favorite: ') + rest(r)); })
     .catch(function (e) { delete S.favOv[id]; refreshRuns(); toast('Could not save favorite: ' + e.message, true); });
 }
@@ -1232,7 +1237,7 @@ function srcSec(r, t) { var P = r.pieces || [], pc = P.filter(function (x) { ret
 function openGrades(btn) {
   var r = selRun(); if (!r || !GM || !GRADES.length) return;
   var cur = colorOf(r), amt = cur.amt, hov = null, pic = IMG_ORIGIN + '/still/' + encodeURIComponent(r.run) + '/' + Math.max(0, srcSec(r, S.t)).toFixed(1) + '.jpg';
-  var p = document.createElement('div'); p.id = 'lookp'; p.dataset.kind = 'color';
+  var p = document.createElement('div'); p.id = 'lookp'; p.dataset.kind = 'color'; p.dataset.run = r.run;
   var defs = function () { return GRADES.map(function (g) { return GM.gradeFilter('cgp-' + g.id, g.id, amt); }).join(''); };
   p.innerHTML = '<svg width="0" height="0" style="position:absolute" id="cgdefs">' + defs() + '</svg><div class="grid"><div class="camrow"><span>Hover a look to see it on the video. Your camera only, text keeps its colors.</span>Strength<input type="range" id="cgAmt" min="0" max="100" step="5" value="' + Math.round(amt * 100) + '"><b id="cgAmtV">' + Math.round(amt * 100) + '%</b></div>' +
     GRADES.map(function (g) { return '<button class="tile' + (g.id === cur.id ? ' cur' : '') + '" data-id="' + h(g.id) + '" title="' + h(g.name + ' - ' + g.note) + '"><span class="crop"><img class="ld" alt="" src="' + pic + '" style="top:-47px;filter:url(#cgp-' + h(g.id) + ')"></span><span><b>' + h(g.name) + '</b>' + (g.id === cur.id ? ' <em>now</em>' : '') + '<br>' + h(g.note) + '</span></button>'; }).join('') + '</div>';
@@ -1247,8 +1252,13 @@ function openGrades(btn) {
 function pickGrade(id, amt) {
   var r = selRun(); if (!r) return;
   var g = GRADES.filter(function (x) { return x.id === id; })[0];
-  S.color[r.run] = { id: id, amt: amt }; save(); applyGrade(r.run, id, amt); renderInfo();
-  postNote('color-grade', { text: id, amt: amt }).then(function (ok) { if (ok) toast('Color grade sent: ' + (g ? g.name : id) + (id !== 'none' && amt < 1 ? ' at ' + Math.round(amt * 100) + '%' : '')); });
+  var was = S.color[r.run], now = S.color[r.run] = { id: id, amt: amt }; save(); applyGrade(r.run, id, amt); renderInfo();
+  postNote('color-grade', { text: id, amt: amt }).then(function (ok) {
+    if (ok) return toast('Color grade sent: ' + (g ? g.name : id) + (id !== 'none' && amt < 1 ? ' at ' + Math.round(amt * 100) + '%' : ''));
+    if (S.color[r.run] !== now) return;
+    if (was === undefined) delete S.color[r.run]; else S.color[r.run] = was;
+    var c = colorOf(r); save(); applyGrade(r.run, c.id, c.amt); renderInfo();
+  });
 }
 var PACKS = [], HOOKSND = [];
 api('/api/sound-packs').then(function (l) { PACKS = l && l.packs ? l.packs : []; HOOKSND = l && l.hookSounds || []; renderInfo(); }).catch(function () {});
@@ -1376,7 +1386,7 @@ function warmLooks(kind) {
   var a = lookAt(r, kind);
   lookItems(kind).forEach(function (x) { var u = lookUrl(r, kind, x.id, a.t); if (!LOOKW[u]) { LOOKW[u] = new Image(); LOOKW[u].src = u; } });
 }
-function closeLooks() { var p = $('lookp'); if (p) p.remove(); [].forEach.call(document.querySelectorAll('.lookb.on'), function (b) { b.classList.remove('on'); }); }
+function closeLooks() { var p = $('lookp'), cr = p && p.dataset.kind === 'color' && runOf(p.dataset.run); if (p) p.remove(); if (cr) { var c = colorOf(cr); applyGrade(cr.run, c.id, c.amt); } [].forEach.call(document.querySelectorAll('.lookb.on'), function (b) { b.classList.remove('on'); }); }
 function openThemes(btn) {
   var r = selRun(); if (!r) return;
   var p = document.createElement('div'); p.id = 'lookp'; p.dataset.kind = 'theme'; p.className = 'themep';
@@ -1387,8 +1397,14 @@ function openThemes(btn) {
 }
 function pickTheme(id) {
   var r = selRun(); if (!r) return;
+  var was = S.theme[r.run];
   S.theme[r.run] = id; S.keepT = S.t; loadFrame(r.run); save(); renderInfo();
-  postNote('theme', { text: id }).then(function (ok) { if (ok) toast('Theme sent: ' + id); });
+  postNote('theme', { text: id }).then(function (ok) {
+    if (ok) return toast('Theme sent: ' + id);
+    if (S.theme[r.run] !== id) return;
+    if (was === undefined) delete S.theme[r.run]; else S.theme[r.run] = was;
+    S.keepT = S.t; loadFrame(r.run); save(); renderInfo();
+  });
 }
 function openLooks(kind, btn) {
   if (kind === 'color') { var wasC = $('lookp') && $('lookp').dataset.kind === 'color'; closeLooks(); if (!wasC) openGrades(btn); return; }
@@ -1481,7 +1497,7 @@ function sfxMenu(c) {
   var set = function (to) {
     m.remove();
     if (to) { if (SPLAY) SPLAY.pause(); SPLAY = new Audio('/sfx/' + encodeURIComponent(to)); SPLAY.volume = 0.6; SPLAY.play().catch(function () {}); }
-    api('/api/note/' + encodeURIComponent(S.video), { method: 'POST', body: JSON.stringify({ kind: 'sfx-edit', run: r.run, label: r.label, t: +at.toFixed(2), cue: at, from: ref, to: to, text: sfxName(ref) + ' -> ' + (to ? sfxName(to) : 'removed') }) })
+    api('/api/note/' + encodeURIComponent(S.video), { method: 'POST', body: JSON.stringify({ id: noteId(), kind: 'sfx-edit', run: r.run, label: r.label, t: +at.toFixed(2), cue: at, from: ref, to: to, text: sfxName(ref) + ' -> ' + (to ? sfxName(to) : 'removed') }) })
       .then(function (j) { if (!j.ok) throw new Error(j.error || 'rejected'); toast(to ? 'Sound: ' + sfxName(to) : 'Sound removed'); return loadVideo(S.video); })
       .catch(function (e) { toast('Sound change failed: ' + e.message, true); });
   };
@@ -1643,7 +1659,7 @@ function addOverlay(mode) {
   var r = selRun(); if (!r) return;
   var t = addAt(), ask = ($('ovAsk') || {}).value || '', name = OVS.filter(function (o) { return o[0] === mode; })[0][1];
   toast(name + ' at ' + fmt(t) + ' · Claude is on it (about 30 s)');
-  api('/api/overlay/' + encodeURIComponent(r.run), { method: 'POST', body: JSON.stringify({ t: t, mode: mode, ask: ask }) }).then(function (j) {
+  api('/api/overlay/' + encodeURIComponent(r.run), { method: 'POST', wait: 120000, body: JSON.stringify({ t: t, mode: mode, ask: ask }) }).then(function (j) {
     if (!j.ok) throw new Error(j.error || 'rejected');
     S.undoN[r.run] = j.undo; toast('Added at ' + fmt(j.t0) + ' · ' + (j.why || '') + (j.credit ? ' · ' + j.credit : '') + ' · Undo removes it');
     return loadVideo(S.video).then(function () { seekAll(j.t0 + 0.4); });
@@ -1662,7 +1678,7 @@ function openSfxMenu(anchor) {
 }
 function addSfx(ref) {
   var r = selRun(); if (!r) return; var t = Math.max(0, Math.min(r.total - 0.2, addAt()));
-  api('/api/note/' + encodeURIComponent(S.video), { method: 'POST', body: JSON.stringify({ kind: 'sfx-add', run: r.run, label: r.label, t: +t.toFixed(2), to: ref, text: 'added ' + sfxName(ref) + ' at ' + fmt(t) }) })
+  api('/api/note/' + encodeURIComponent(S.video), { method: 'POST', body: JSON.stringify({ id: noteId(), kind: 'sfx-add', run: r.run, label: r.label, t: +t.toFixed(2), to: ref, text: 'added ' + sfxName(ref) + ' at ' + fmt(t) }) })
     .then(function (j) { if (!j.ok) throw new Error(j.error || 'rejected'); toast('Sound added: ' + sfxName(ref) + ' at ' + fmt(t)); return loadVideo(S.video); })
     .catch(function (e) { toast('Could not add the sound: ' + e.message, true); });
 }
@@ -1719,7 +1735,7 @@ function addHere(opt) {
     tick(); S.pendTm = setInterval(tick, 1000);
     toast('Claude is ' + (opt.draw ? 'drawing a card' : 'picking something') + ' for ' + fmt(S.pendAdd.t) + ' - keep working, it lands on its own');
   }
-  api('/api/addfx/' + encodeURIComponent(r.run), { method: 'POST', body: JSON.stringify({ t: t, ask: ask, fx: opt.fx || null, draw: !!opt.draw }) }).then(function (j) {
+  api('/api/addfx/' + encodeURIComponent(r.run), { method: 'POST', wait: 120000, body: JSON.stringify({ t: t, ask: ask, fx: opt.fx || null, draw: !!opt.draw }) }).then(function (j) {
     if (!j.ok) throw new Error(j.error || 'rejected');
     if (ask && slow) ta.value = '';
     S.undoN[r.run] = j.undo; toast('Added ' + j.name + ' at ' + fmt(j.t0) + (j.moved ? ' (after the hook title)' : '') + (slow && j.why ? ' · ' + j.why : '') + ' · drag it to move · Undo removes it');
@@ -2082,7 +2098,7 @@ function renderSent(newest) {
   $('sentN').textContent = ns.length ? ns.length + ' sent' : '';
   $('sent').innerHTML = ns.length ? ns.slice(0, 30).map(function (n, ix) {
     var K = KINDS[n.kind] || [n.kind, ''], r = runOf(n.run);
-    return '<div class="sn' + (n._p ? ' pend' : '') + (n._f ? ' failed' : '') + (newest && ix === 0 ? ' new' : '') + '"><span class="tm">' + (n._p ? 'sending' : n._f ? 'failed' : timeAgo(n.at)) + '</span><span><span class="k ' + K[1] + '">' + h(K[0]) + '</span> <span class="sub">' + h(r ? letter(r, idx(r)) : n.label || '') + (n.t != null && n.kind !== 'pick' && n.kind !== 'render' ? ' at ' + fmt(n.t) : '') + (n.rule ? ' - ' + h(n.rule) : '') + '</span>' + (n.shot ? '<img src="/noteshot/' + encodeURIComponent(S.video) + '/' + encodeURIComponent(String(n.shot).split('/').pop()) + '" alt="" data-zoom title="The frame saved with this note">' : '') + (n.text ? '<div>' + h(n.text) + '</div>' : '') + (n.kind === 'note' && !n._p ? (replies[n.at] || []).map(function (x) { return '<div class="rp"><b>Claude</b> ' + h(x.text) + '</div>'; }).join('') || '<div class="rp wait">Waiting for Claude to answer</div>' : '') + (n._f ? ' <button class="rt" data-retry="' + S.notes.indexOf(n) + '">Retry</button>' : '') + '</span></div>';
+    return '<div class="sn' + (n._p ? ' pend' : '') + (n._f ? ' failed' : '') + (newest && ix === 0 ? ' new' : '') + '"><span class="tm">' + (n._p ? 'sending' : n._f ? 'failed' : timeAgo(n.at)) + '</span><span><span class="k ' + K[1] + '">' + h(K[0]) + '</span> <span class="sub">' + h(r ? letter(r, idx(r)) : n.label || '') + (n.t != null && n.kind !== 'pick' && n.kind !== 'render' ? ' at ' + fmt(n.t) : '') + (n.rule ? ' - ' + h(n.rule) : '') + '</span>' + (typeof n.shot === 'string' && n.shot ? '<img src="/noteshot/' + encodeURIComponent(S.video) + '/' + encodeURIComponent(String(n.shot).split('/').pop()) + '" alt="" data-zoom title="The frame saved with this note">' : '') + (n.text ? '<div>' + h(n.text) + '</div>' : '') + (n.kind === 'note' && !n._p ? (replies[n.at] || []).map(function (x) { return '<div class="rp"><b>Claude</b> ' + h(x.text) + '</div>'; }).join('') || '<div class="rp wait">Waiting for Claude to answer</div>' : '') + (n._f ? ' <button class="rt" data-retry="' + S.notes.indexOf(n) + '">Retry</button>' : '') + '</span></div>';
   }).join('') : '<div class="hint" style="padding:4px 8px">Nothing sent yet. Notes you send show up here.</div>';
   renderDrafts();
 }
@@ -2095,16 +2111,17 @@ function recheck(r, i, b) {
     return loadVideo(S.video).then(function () { var n = selRun(), still = n && n.issues.some(function (x) { return sigOf(x) === sigOf(i); }); toast(still ? i.rule + ' still there after the re-check' : i.rule + ' gone after the re-check'); });
   }).catch(function (e) { toast('Could not re-check: ' + e.message, true); b.disabled = false; b.textContent = 'Re-check'; });
 }
+function noteId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 function postNote(kind, o) {
   var r = selRun(); if (!r) return Promise.resolve();
-  var body = Object.assign({ kind: kind, run: r.run, label: r.label, t: +(S.noteT != null ? S.noteT : S.t).toFixed(2), grade: r.grade }, o || {});
+  var body = Object.assign({ id: noteId(), kind: kind, run: r.run, label: r.label, t: +(S.noteT != null ? S.noteT : S.t).toFixed(2), grade: r.grade }, o || {});
   var item = Object.assign({}, body, { at: new Date().toISOString(), _p: 1 });
   S.notes.push(item); renderSent(true); renderHeader();
   return send_(item, body);
 }
 function send_(item, body) {
   item._f = 0; item._p = 1;
-  return api('/api/note/' + encodeURIComponent(S.video), { method: 'POST', body: JSON.stringify(body) }).then(function (j) {
+  return api('/api/note/' + encodeURIComponent(S.video), { method: 'POST', wait: body.shot ? 120000 : 8000, body: JSON.stringify(body) }).then(function (j) {
     if (!j.ok) throw new Error(j.error || 'rejected');
     item._p = 0; item.at = (j.got && j.got.at) || item.at; if (j.got && 'shot' in j.got) item.shot = j.got.shot; renderSent(); renderHeader(); return true;
   }).catch(function (e) { item._p = 0; item._f = 1; renderSent(); toast('Could not send: ' + e.message, true); return false; });
@@ -2113,8 +2130,8 @@ function flash(btn, txt) { var o = btn.dataset.o || btn.textContent; btn.dataset
 function sendNote() {
   var ta = $('note'), txt = ta.value.trim(); if (!txt) { ta.focus(); toast('Write something first', true); return; }
   var r = selRun(), o = { text: txt, shot: true }; if (S.selIssue) { var i = r.issues.filter(function (x) { return x.id === S.selIssue; })[0]; if (i) { o.issue = i.id; o.rule = i.rule; } }
-  var btn = $('bSend'); postNote('note', o).then(function (ok) { if (ok) { ta.value = ''; S.noteT = null; renderCtx(); flash(btn, 'Sent to Claude'); toast('Sent: note on ' + letter(r, idx(r)) + ' at ' + fmt(+(o.t || S.t))); } });
-  ta.value = ''; S.noteT = null;
+  var btn = $('bSend'); postNote('note', o).then(function (ok) { if (ok) { flash(btn, 'Sent to Claude'); toast('Sent: note on ' + letter(r, idx(r)) + ' at ' + fmt(+(o.t || S.t))); } else if (!ta.value) { ta.value = txt; save(); } });
+  ta.value = ''; S.noteT = null; renderCtx(); save();
 }
 
 /* ---------- drafts: notes kept on the timeline, sent together ---------- */
@@ -2154,7 +2171,7 @@ function sendDrafts() {
   var batch = Date.now().toString(36), done = 0; b.disabled = true;
   l.reduce(function (p, d, k) {
     return p.then(function () {
-      var r = runOf(d.run), body = { kind: 'note', run: d.run, label: r ? r.label : d.label, t: d.t, grade: r ? r.grade : null, text: d.text, shot: true, batch: batch, n: k + 1, of: l.length };
+      var r = runOf(d.run), body = { id: 'dr' + d.id, kind: 'note', run: d.run, label: r ? r.label : d.label, t: d.t, grade: r ? r.grade : null, text: d.text, shot: true, batch: batch, n: k + 1, of: l.length };
       if (d.issue) { body.issue = d.issue; body.rule = d.rule; }
       b.textContent = 'Sending ' + (k + 1) + '/' + l.length;
       var item = Object.assign({}, body, { at: new Date().toISOString(), _p: 1 }); S.notes.push(item); renderSent(true);
@@ -2325,7 +2342,7 @@ window.addEventListener('message', function (m) {
   if (d.click) { if (id !== S.sel && S.mode === 'compare') selectRun(id); else togglePlay(); return; }
   if (d.moved) return doMove(id, d.moved);
   if (d.editHook) { if (id !== S.sel) selectRun(id); var hb = document.querySelector('#itop [data-hk="title"]'); if (hb) { hb.focus(); getSelection().selectAllChildren(hb); } return; }
-  if (d.picked !== undefined) return selectItem(d.picked ? { what: d.picked.what, k: d.picked.k, label: d.picked.label } : null, true);
+  if (d.picked !== undefined) return id === S.sel && selectItem(d.picked ? { what: d.picked.what, k: d.picked.k, label: d.picked.label } : null, true);
   if (d.key) return onKey({ key: d.key, metaKey: d.meta, ctrlKey: false, shiftKey: d.shift, altKey: false, target: document.body, preventDefault: function () {} });
   if (d.t == null) return;
   if (!rt.ready) return;
@@ -2343,7 +2360,6 @@ window.addEventListener('message', function (m) {
     if (now - (rt.fixAt || 0) > 600 && S.t < x.total - 0.4 && Math.abs(d.t - S.t) > 0.4) { rt.fixAt = now; send(id, { cmd: 'seek', t: S.t }); if (!d.playing) send(id, { cmd: 'play' }); }
   }
 });
-['playAll', 'pauseAll'].forEach(function () {});
 
 /* ---------- edit ideas ---------- */
 var IDV = { heygen: 'your cloned voice (HeyGen), audio only, no avatar', you: 'you re-record this line', keep: 'your take, just trimmed', none: 'no words, the clip plays its own sound' };
@@ -2579,7 +2595,9 @@ function fullEmpty(html) { var f = $('fullEmpty'); f.hidden = !html; f.innerHTML
 function sig(r) { return JSON.stringify([r.pieces, r.captions, r.fx, r.sfx, r.captionStyle, r.path]); }
 function absorb(d, first) {
   var old = {}; runs().forEach(function (r) { old[r.run] = sig(r); });
-  S.data = d; S.notes = d.notes || [];
+  var got = (d.notes || []).map(function (n) { return n.id; }).filter(Boolean);
+  var local = S.data && S.data.video === d.video ? (S.notes || []).filter(function (n) { return (n._p || n._f) && got.indexOf(n.id) < 0; }) : [];
+  S.data = d; S.notes = (d.notes || []).concat(local);
   if (d.favs) Object.keys(S.favOv).forEach(function (k) { if (!!d.favs[k] === S.favOv[k]) delete S.favOv[k]; }); S.stamp = d.stamp;
   assignLetters(d.runs);
   var ids = d.runs.map(function (r) { return r.run; });
@@ -2680,9 +2698,13 @@ function loadVideo(v, first) {
   me.p = loadVideo0(v, first).finally(function () { if (vload === me) vload = null; });
   return me.p;
 }
+var vgen = 0, vlast = null;
 function loadVideo0(v, first) {
+  var gen = ++vgen;
   if (first || !S.data || S.data.video !== v) document.body.classList.add('busy');
-  return api('/api/video/' + encodeURIComponent(v)).finally(function () { document.body.classList.remove('busy'); }).then(function (d) {
+  return vlast = api('/api/video/' + encodeURIComponent(v)).finally(function () { document.body.classList.remove('busy'); }).then(function (d) {
+    if (S.video && S.video !== v) return;
+    if (gen !== vgen) return vlast;
     S.video = v; if (first || S.data == null || S.data.video !== v) { Object.keys(cols).forEach(function (id) { cols[id].remove(); delete cols[id]; }); S.rt = {}; S.selIssue = null; S.selCheck = null; S.sel = null; S.playing = false; }
     S.pre = null; absorb(d, first); ensureStyles(); fullEmpty(''); renderAll(); save(); document.body.classList.remove('booting');
   });
@@ -2690,25 +2712,26 @@ function loadVideo0(v, first) {
 function selectRun(id, quiet) {
   if (!runOf(id)) return;
   var wasCmp = S.mode === 'compare';
-  if (id !== S.sel) { S.selIssue = null; S.selCheck = null; S.sel = id; S.noteT = null; if (!wasCmp) { S.playing = false; sendAll({ cmd: 'pause' }); S.keepT = null; S.t = S.pos[id] || 0; } }
+  if (id !== S.sel) { if (S.selItem) selectItem(null); S.ideaSel = false; S.selIssue = null; S.selCheck = null; S.sel = id; S.noteT = null; if (!wasCmp) { S.playing = false; sendAll({ cmd: 'pause' }); S.keepT = null; S.t = S.pos[id] || 0; } }
   syncCols(); renderHeader(); renderTune(); renderInfo(); renderScript(); renderIssues(false); renderMedia(); renderScrub(); renderLanes(); renderCtx(); pushAudio(); updateTick(); save(); maybeScan();
 }
 function setMode(m) {
   if (m === S.mode) return;
+  if (S.selItem) selectItem(null);
   S.mode = m;
   if (m === 'compare') { if (S.cmp.indexOf(S.sel) < 0) S.cmp.unshift(S.sel); if (S.cmp.length < 2) { var o = runs().filter(function (x) { return x.run !== S.sel; }); var b = bestRun(); S.cmp.push((b.run !== S.sel ? b : o[0]).run); } S.cmp = S.cmp.slice(0, 4); }
   syncCols(); renderAll(); setTimeout(function () { Object.keys(cols).forEach(function (id) { if (rtOf(id).ready) onReady(id); }); pushAudio(); }, 0); save();
 }
 function toggleCmp(id) {
   var i = S.cmp.indexOf(id);
-  if (i >= 0) { if (S.cmp.length <= 2) { toast('Compare needs at least 2 versions', true); return; } S.cmp.splice(i, 1); if (S.sel === id) S.sel = S.cmp[0]; }
+  if (i >= 0) { if (S.cmp.length <= 2) { toast('Compare needs at least 2 versions', true); return; } S.cmp.splice(i, 1); if (S.sel === id) { if (S.selItem) selectItem(null); S.ideaSel = false; S.sel = S.cmp[0]; } }
   else { if (S.cmp.length >= 4) { toast('Compare shows up to 4 at a time', true); return; } S.cmp.push(id); }
   S.cmp.sort(function (a, b) { return runs().indexOf(runOf(a)) - runs().indexOf(runOf(b)); });
   S.selIssue = null; S.selCheck = null; syncCols(); renderAll(); pushAudio(); save();
 }
 
 /* ---------- polling ---------- */
-var failN = 0, reloadT;
+var failN = 0, reloadT, polling = false, pollQuick = false;
 function setOffline(o) {
   if (o === S.offline) return; S.offline = o; $('offline').hidden = !o;
   if (!o) { Object.keys(cols).forEach(function (id) { if (rtOf(id).error) loadFrame(id); }); schedReload(0); }
@@ -2716,26 +2739,30 @@ function setOffline(o) {
 function schedReload(ms) { clearTimeout(reloadT); reloadT = setTimeout(function () { if (S.video) loadVideo(S.video).catch(function () {}); }, ms); }
 function poll() {
   if (!S.video) return bootRetry();
+  if (polling) { if (S.quick) pollQuick = true; return; }
+  polling = true;
   api('/api/pipe/' + encodeURIComponent(S.video)).then(function (p) {
     failN = 0; setOffline(false); if (p.eta) { S.eta = p.eta; S.etaNow = p.now; }
-    if (p.page) { if (S.page && S.page !== p.page) { if (document.hidden) { save(); location.reload(); return; } pageStale(); } else S.page = p.page; }
+    if (p.page) { if (S.page && S.page !== p.page) { if (document.hidden && !unsaved()) { saveNow(); location.reload(); return; } pageStale(); } else S.page = p.page; }
     if (S.data) { S.data.pipe = p.pipe; S.data.busy = p.busy; S.data.log = p.log; applyWorking(p); } else S.pre = p;
     renderPipe(); renderHeader();
     if (!S.data) schedReload(0);
     else if (p.stamp !== S.stamp) { S.stamp = p.stamp; schedReload(p.busy ? 3000 : S.quick ? 0 : 400); }
     S.quick = false;
     if (S.data && !selRun()) renderRaw();
-  }).catch(function () { failN++; if (failN >= 2) setOffline(true); });
+  }).catch(function () { failN++; if (failN >= 2) setOffline(true); }).then(pollDone, pollDone);
 }
+function pollDone() { polling = false; if (pollQuick) { pollQuick = false; S.quick = true; setTimeout(poll, 0); } }
 function bootRetry() { boot(); }
+function unsaved() { return !!$('note').value.trim() || Object.keys(S.pend).some(function (k) { return Object.keys(S.pend[k] || {}).length > 0; }); }
 function pageStale() {
   if ($('staleB')) return;
   var b = document.createElement('button'); b.id = 'staleB'; b.className = 'btn sm'; b.textContent = 'Page updated - reload';
   b.title = 'The editor code changed. Reloads when you click, or next time you leave this tab.';
   b.style.cssText = 'position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:99;background:var(--accent);color:#fff';
-  b.onclick = function () { save(); location.reload(); };
+  b.onclick = function () { saveNow(); location.reload(); };
   document.body.appendChild(b);
-  document.addEventListener('visibilitychange', function () { if (document.hidden) { save(); location.reload(); } });
+  document.addEventListener('visibilitychange', function () { if (document.hidden && !unsaved()) { saveNow(); location.reload(); } });
 }
 
 /* ---------- events ---------- */
@@ -2802,6 +2829,7 @@ function bind() {
   $('bLoop').addEventListener('click', toggleLoop); $('bSnd').addEventListener('click', toggleSound);
   bindScrub($('scrub'), $('shov'), null);
   $('lanes').addEventListener('click', function (e) { var d = e.target.dataset && e.target.dataset.iss; if (d) { selectIssue(d); } var ib = e.target.closest('[data-idea]'); if (ib) selectIdea(ib.dataset.idea, false); });
+  document.addEventListener('mousedown', function (e) { if (S.ideaSel && e.target.closest && !e.target.closest('#ideaPanel,[data-idea]')) { S.ideaSel = false; renderLanes(); } });
   $('ideaPanel').addEventListener('click', function (e) {
     if (e.target.closest('#idPrev')) return stepIdea(-1); if (e.target.closest('#idNext')) return stepIdea(1);
     var ob = e.target.closest('[data-ido]'); if (ob) { S.ideaSel = true; return decideIdea('approve', '', ob.dataset.ido); }
@@ -2837,19 +2865,13 @@ function bind() {
     var oc = e.target.closest('[data-oc]'), row = e.target.closest('.chk'); if (!row) return;
     selectCheck(row.dataset.rule, oc ? +oc.dataset.oc : 0);
   });
-  $('note').addEventListener('input', function () { if (S.noteT == null && this.value) { S.noteT = S.t; renderCtx(); } if (!this.value) { S.noteT = null; renderCtx(); } });
+  $('note').addEventListener('input', function () { if (S.noteT == null && this.value) { S.noteT = S.t; renderCtx(); } if (!this.value) { S.noteT = null; renderCtx(); } save(); });
   $('note').addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); sendNote(); } else if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); addDraft(); } });
   bindDrafts();
   $('ctx').addEventListener('click', function (e) { if (e.target.closest('[data-clr]')) { S.selIssue = null; sendAll({ cmd: 'clear' }); renderIssues(); renderCtx(); renderLanes(); } });
   $('bSend').addEventListener('click', sendNote);
   $('bPick').addEventListener('click', function () { var r = selRun(), b = this; postNote('pick').then(function (ok) { if (ok) { flash(b, 'Picked'); toast('Picked version ' + letter(r, idx(r)) + ' - Claude has it'); } }); });
   $('bRender').addEventListener('click', openExport);
-  $('bRender').addEventListener('click_old', function () {
-    var b = this, r = selRun();
-    if (S.armed !== 'render') { S.armed = 'render'; b.textContent = 'Click again to confirm'; b.classList.add('arm'); clearTimeout(bind.rt); bind.rt = setTimeout(function () { S.armed = null; b.textContent = 'Final render'; b.classList.remove('arm'); }, 3000); return; }
-    S.armed = null; b.classList.remove('arm'); b.textContent = 'Final render';
-    postNote('render').then(function (ok) { if (ok) { flash(b, 'Requested'); toast('Final render requested for ' + letter(r, idx(r))); } });
-  });
   $('sent').addEventListener('click', function (e) { var b = e.target.closest('[data-retry]'); if (b) { var n = S.notes[+b.dataset.retry]; if (n) { var body = Object.assign({}, n); delete body._p; delete body._f; send_(n, body); renderSent(); } } });
   $('pbox').addEventListener('click', function (e) {
     var fv = e.target.closest('[data-fav]'); if (fv) { toggleFav(fv.dataset.fav); return; }
@@ -2876,7 +2898,8 @@ function bind() {
   $('info').addEventListener('mouseover', function (e) { var b = e.target.closest('.lookb'); if (b) warmLooks(b.dataset.look); });
   addEventListener('resize', function () { layoutStage(); renderLanes(); });
   if (window.ResizeObserver) new ResizeObserver(function () { layoutStage(); splitInfo(); }).observe($('stage'));
-  addEventListener('beforeunload', function () { save(); });
+  addEventListener('beforeunload', saveNow);
+  addEventListener('pagehide', saveNow);
   document.addEventListener('keydown', onKey);
 }
 function toggleLoop() { S.loop = !S.loop; pushAudio(); updateTick(); save(); }
@@ -2929,7 +2952,7 @@ function onKey(e) {
 }
 
 function changeVideo(v) {
-  S.pos = {}; Object.keys(cols).forEach(function (id) { cols[id].remove(); delete cols[id]; }); S.data = null; S.pre = null; S.sel = null; S.cmp = []; S.video = v; S.selCheck = null; S.selIssue = null; cache = {}; closePick();
+  S.pos = {}; Object.keys(cols).forEach(function (id) { cols[id].remove(); delete cols[id]; }); S.data = null; S.pre = null; S.sel = null; S.cmp = []; S.video = v; S.selCheck = null; S.selIssue = null; S.ideaSel = false; S.noteOk = true; cache = {}; closePick(); if (S.selItem) selectItem(null);
   renderAll();
   return loadVideo(v, true).catch(function (e) { if (e.message === 'HTTP 404') toast('Waiting for ' + v + ' to appear', true); else setOffline(true); });
 }
@@ -3059,7 +3082,6 @@ var HS = [
 ];
 var VKEY = 'yap.view';
 function isSimple() { return document.body.classList.contains('simple'); }
-function simpleRight() { return document.body.classList.contains('claude-on') || !$('ideaPanel').hidden; }
 function setView(v, keep) {
   document.body.classList.toggle('simple', v === 'simple');
   [].forEach.call($('viewsw').querySelectorAll('button'), function (b) { b.classList.toggle('on', b.dataset.vw === v); });
@@ -3077,7 +3099,7 @@ function setView(v, keep) {
 })();
 function applySizes() {
   var c = $('cols'), z = S.sz;
-  c.classList.toggle('noL', isSimple() || !!z.hideL); c.classList.toggle('noR', (isSimple() && !simpleRight()) || !!z.hideR);
+  c.classList.toggle('noL', isSimple() || !!z.hideL); c.classList.toggle('noR', !!z.hideR && !isSimple());
   $('railL').classList.toggle('on', !z.hideL); $('railR').classList.toggle('on', !z.hideR);
   $('lanes').classList.toggle('sized', !!z.tl); $('lanes').style.height = z.tl ? z.tl + 'px' : '';
   $('lanes').style.setProperty('--lh', z.tl ? Math.max(15, Math.min(44, Math.floor((z.tl - 52) / (AUD_ON ? 9 : 8)))) + 'px' : '');
@@ -3418,9 +3440,15 @@ function boot() {
     failN = 0; setOffline(false); S.videos = list;
     if (!list.length) { fullEmpty(' '); openStart(true); return; }
     var v = (LOADED.video && list.some(function (x) { return x.video === LOADED.video; })) ? LOADED.video : list[0].video;
-    if (S.data) return;
+    if (S.data || vload) return;
     return loadVideo(v, true).then(function () {
       if (S.mode === 'compare' && S.cmp.length < 2) { S.cmp = [S.sel]; var o = runs().filter(function (x) { return x.run !== S.sel; })[0]; if (o) S.cmp.push(o.run); syncCols(); renderAll(); }
+      if (LOADED.noteV === v && S.video === v) {
+        var nb = $('note'); if (nb && !nb.value && LOADED.note) { nb.value = LOADED.note; S.noteT = S.t; renderCtx(); }
+        (LOADED.unsent || []).forEach(function (u) { if (u && !S.notes.some(function (n) { return n.id && n.id === u.id; })) S.notes.push(Object.assign({}, u, { _f: 1 })); });
+        if (LOADED.unsent && LOADED.unsent.length) { renderSent(); renderHeader(); }
+      }
+      if (S.video === v) S.noteOk = true;
     });
   }).catch(function () { failN++; if (failN >= 2) setOffline(true); });
 }
